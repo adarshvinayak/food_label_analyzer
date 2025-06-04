@@ -55,7 +55,6 @@
             <p class="text-slate-600 mt-2 text-lg">Analyze food ingredients for a healthier choice.</p>
         </header>
 
-        <!-- Input Section -->
         <section id="inputSection" class="mb-8">
             <h2 class="text-2xl font-semibold text-teal-600 mb-4 border-b-2 border-teal-200 pb-2">Step 1: Provide Ingredients</h2>
             
@@ -89,12 +88,10 @@
                     <div class="bg-slate-200 rounded-lg overflow-hidden shadow-inner aspect-video max-h-[400px] mx-auto">
                         <video id="cameraFeed" playsinline class="w-full h-full object-cover"></video>
                     </div>
-                    <canvas id="imageCanvas" class="hidden"></canvas> <!-- For capturing frame -->
-                </div>
+                    <canvas id="imageCanvas" class="hidden"></canvas> </div>
             </div>
         </section>
 
-        <!-- Review Section -->
         <section id="reviewSection" class="mb-8">
             <h2 class="text-2xl font-semibold text-teal-600 mb-4 border-b-2 border-teal-200 pb-2">Step 2: Review & Analyze</h2>
             <label for="ingredientsText" class="block mb-2 text-sm font-medium text-slate-700">Extracted or manually entered ingredients (edit if needed):</label>
@@ -105,13 +102,11 @@
             </button>
         </section>
 
-        <!-- Status and Results Section -->
         <section id="resultsSection">
             <h2 class="text-2xl font-semibold text-teal-600 mb-4 border-b-2 border-teal-200 pb-2">Step 3: Analysis Results</h2>
             <div id="statusMessage" class="mb-6 p-4 rounded-lg text-sm min-h-[50px]"></div>
             <div id="analysisOutput" class="space-y-6">
-                <!-- Analysis results will be injected here -->
-            </div>
+                </div>
         </section>
 
          <footer class="mt-12 text-center text-xs text-slate-500">
@@ -279,12 +274,12 @@
             setLoading(analyzeBtnText, analyzeLoader, true, '✨ Analyze Ingredients');
             
             // This is where you would call your backend endpoint for OCR
-            // Example: const backendOcrUrl = '/api/perform-ocr';
+            // FIX: Corrected endpoint from '/api/perform-ocr' to '/api/ocr' to match Vercel function name
             try {
-                const response = await fetch('/api/perform-ocr', { // Replace with your actual backend endpoint
+                const response = await fetch('/api/ocr', { 
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ image_data: base64ImageData })
+                    body: JSON.stringify({ image_data: base64ImageData }) // Frontend sends 'image_data'
                 });
                 
                 if (!response.ok) {
@@ -326,12 +321,12 @@
             analysisOutputDiv.innerHTML = '';
 
             // This is where you would call your backend endpoint for analysis using Groq
-            // Example: const backendAnalysisUrl = '/api/analyze-ingredients';
+            // FIX: Corrected endpoint from '/api/analyze-ingredients' to '/api/analyze' to match Vercel function name
             try {
-                const response = await fetch('/api/analyze-ingredients', { // Replace with your actual backend endpoint
+                const response = await fetch('/api/analyze', { 
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ ingredients_text: ingredients, model: "llama-3.3-70b-versatile" })
+                    body: JSON.stringify({ ingredients_text: ingredients, model: "llama-3.3-70b-versatile" }) // Frontend sends 'ingredients_text'
                 });
 
                 if (!response.ok) {
