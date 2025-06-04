@@ -1,0 +1,12 @@
+{
+  "name": "ingredient-inspector",
+  "version": "1.0.0",
+  "description": "A food ingredient analyzer deployed on Vercel.",
+  "main": "api/analyze.js",
+  "scripts": {
+    "start": "vercel dev"
+  },
+  "dependencies": {
+    "groq-sdk": "^0.8.0" // Use the latest stable version
+  }
+}
