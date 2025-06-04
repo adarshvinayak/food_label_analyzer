@@ -34,8 +34,8 @@
             transform: scaleX(-1); /* Mirror mode for selfie view */
         }
         .loader {
-            border: 4px solid #f3f3f3; /* Light grey */
-            border-top: 4px solid #0D9488; /* Teal-700 */
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #0D9488;
             border-radius: 50%;
             width: 30px;
             height: 30px;
@@ -121,7 +121,11 @@
     </div>
 
     <script>
-        // --- NO API KEYS STORED IN CLIENT-SIDE SCRIPT ---
+        // --- NO API KEYS ARE STORED ON THE CLIENT-SIDE ---
+        // API calls are now directed to backend endpoints.
+        // You need to implement these backend endpoints (/api/perform-ocr and /api/analyze-ingredients)
+        // which will securely handle your API keys and make the actual calls to
+        // Google Vision API and Groq API respectively.
 
         // --- DOM ELEMENTS ---
         const tabUpload = document.getElementById('tabUpload');
@@ -154,7 +158,7 @@
             cameraContent.classList.add('hidden');
             tabUpload.classList.add('active');
             tabCamera.classList.remove('active');
-            stopCamera(); 
+            stopCamera();
         });
 
         tabCamera.addEventListener('click', () => {
@@ -191,9 +195,9 @@
                     imagePreview.src = e.target.result;
                     imagePreview.classList.remove('hidden');
                     ingredientsTextarea.value = ''; 
-                    analysisOutputDiv.innerHTML = ''; 
-                    showStatus('Image selected. Performing OCR...', false);
-                    performOcrViaServer(e.target.result.split(',')[1]); // Pass base64 data
+                    analysisOutputDiv.innerHTML = '';
+                    showStatus('Image selected. Performing OCR via backend...', false);
+                    performOcrWithBackend(e.target.result.split(',')[1]); // Pass base64 data
                 }
                 reader.readAsDataURL(file);
             } else {
@@ -206,15 +210,7 @@
         startCameraBtn.addEventListener('click', async () => {
             if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
                 try {
-                    // Prefer environment (rear) camera
-                    const constraints = { 
-                        video: { 
-                            facingMode: 'environment',
-                            width: { ideal: 1280 }, // Request a reasonable resolution
-                            height: { ideal: 720 }
-                        } 
-                    };
-                    cameraStream = await navigator.mediaDevices.getUserMedia(constraints);
+                    cameraStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
                     cameraFeed.srcObject = cameraStream;
                     cameraFeed.classList.remove('hidden');
                     startCameraBtn.classList.add('hidden');
@@ -222,26 +218,14 @@
                     captureImageBtn.classList.remove('hidden');
                     showStatus('Camera started. Position the ingredients label.', false);
                 } catch (error) {
-                    console.warn("Could not get environment camera, trying user (front) camera:", error);
-                    try { // Fallback to user (front) camera if environment fails
-                        const fallbackConstraints = { video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } } };
-                        cameraStream = await navigator.mediaDevices.getUserMedia(fallbackConstraints);
-                        cameraFeed.srcObject = cameraStream;
-                        cameraFeed.classList.remove('hidden');
-                        startCameraBtn.classList.add('hidden');
-                        stopCameraBtn.classList.remove('hidden');
-                        captureImageBtn.classList.remove('hidden');
-                        showStatus('Using front camera. Position the ingredients label.', false);
-                    } catch (fallbackError) {
-                        console.error("Error accessing any camera:", fallbackError);
-                        showStatus(`Error accessing camera: ${fallbackError.name}. Please ensure permissions are granted and a camera is available.`, true);
-                        if (fallbackError.name === "NotAllowedError") {
-                            showStatus("Camera access was denied. Please allow camera access in your browser settings and refresh the page.", true);
-                        } else if (fallbackError.name === "NotFoundError" || fallbackError.name === "DevicesNotFoundError") {
-                            showStatus("No camera found. Please ensure a camera is connected and enabled.", true);
-                        } else {
-                            showStatus("Could not access the camera. Please check your browser settings and ensure a camera is available.", true);
-                        }
+                    console.error("Error accessing camera:", error);
+                    showStatus(`Error accessing camera: ${error.name}. Please ensure permissions are granted.`, true);
+                     if (error.name === "NotAllowedError") {
+                         showStatus("Camera access was denied. Please allow camera access in your browser settings and refresh the page.", true);
+                    } else if (error.name === "NotFoundError" || error.name === "DevicesNotFoundError") {
+                        showStatus("No camera found. Please ensure a camera is connected and enabled.", true);
+                    } else {
+                        showStatus("Could not access the camera. Please check your browser settings and ensure a camera is available.", true);
                     }
                 }
             } else {
@@ -254,7 +238,7 @@
         function stopCamera() {
             if (cameraStream) {
                 cameraStream.getTracks().forEach(track => track.stop());
-                cameraFeed.srcObject = null; 
+                cameraFeed.srcObject = null;
                 cameraStream = null;
                 startCameraBtn.classList.remove('hidden');
                 stopCameraBtn.classList.add('hidden');
@@ -264,24 +248,20 @@
         }
         
         captureImageBtn.addEventListener('click', () => {
-            if (!cameraStream || !cameraFeed.srcObject) { // Check if camera is actually streaming
-                showStatus('Camera not active or stream not available. Please start the camera first.', true);
+            if (!cameraStream) {
+                showStatus('Camera not active. Please start the camera first.', true);
                 return;
             }
-            // Ensure video dimensions are available
-            if (cameraFeed.videoWidth === 0 || cameraFeed.videoHeight === 0) {
-                showStatus('Camera dimensions not yet available. Please wait a moment and try again.', true);
-                return;
-            }
-
             const context = imageCanvas.getContext('2d');
             imageCanvas.width = cameraFeed.videoWidth;
             imageCanvas.height = cameraFeed.videoHeight;
-            
             context.save();
-            // If cameraFeed is mirrored for display (scaleX(-1)), we draw it normally onto the canvas.
-            // The actual video stream data is not mirrored.
-            context.drawImage(cameraFeed, 0, 0, imageCanvas.width, imageCanvas.height);
+            if (cameraFeed.style.transform === 'scaleX(-1)') {
+                context.scale(-1, 1);
+                context.drawImage(cameraFeed, -imageCanvas.width, 0, imageCanvas.width, imageCanvas.height);
+            } else {
+                context.drawImage(cameraFeed, 0, 0, imageCanvas.width, imageCanvas.height);
+            }
             context.restore();
 
             const imageDataUrl = imageCanvas.toDataURL('image/png');
@@ -289,39 +269,43 @@
             imagePreview.classList.remove('hidden');
             ingredientsTextarea.value = ''; 
             analysisOutputDiv.innerHTML = ''; 
-            showStatus('Image captured. Performing OCR...', false);
-            performOcrViaServer(imageDataUrl.split(',')[1]); // Pass base64 data
-            // stopCamera(); // Optionally stop camera after capture - user might want to take multiple shots
+            showStatus('Image captured. Performing OCR via backend...', false);
+            performOcrWithBackend(imageDataUrl.split(',')[1]); // Pass base64 data
+            stopCamera(); 
         });
 
-        // --- OCR FUNCTION (Calls Vercel Serverless Function) ---
-        async function performOcrViaServer(base64ImageData) {
+        // --- OCR FUNCTION (Calls Backend) ---
+        async function performOcrWithBackend(base64ImageData) {
             setLoading(analyzeBtnText, analyzeLoader, true, '✨ Analyze Ingredients');
             
+            // This is where you would call your backend endpoint for OCR
+            // Example: const backendOcrUrl = '/api/perform-ocr';
             try {
-                const response = await fetch('/api/ocr', { // Calls your Vercel serverless function
+                const response = await fetch('/api/perform-ocr', { // Replace with your actual backend endpoint
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ imageBase64: base64ImageData })
+                    body: JSON.stringify({ image_data: base64ImageData })
                 });
-                const result = await response.json(); 
-
+                
                 if (!response.ok) {
-                    console.error('OCR Serverless Function Error:', result);
-                    showStatus(`OCR Error: ${result.error || "Unknown error from OCR service"}`, true);
-                    ingredientsTextarea.value = `OCR failed: ${result.error || "Unknown"}`;
-                    return; 
+                    const errorResult = await response.json().catch(() => ({ message: "Unknown error from OCR backend." }));
+                    throw new Error(errorResult.message || `OCR backend request failed with status ${response.status}`);
                 }
                 
-                if (result.text) {
+                const result = await response.json(); // Assuming backend returns { "text": "detected_text" } or { "error": "message" }
+
+                if (result.error) {
+                    showStatus(`OCR Error from backend: ${result.error}`, true);
+                    ingredientsTextarea.value = `OCR failed: ${result.error}`;
+                } else if (result.text) {
                     ingredientsTextarea.value = result.text;
                     showStatus('OCR successful! Review the text and click Analyze.', false);
                 } else {
                     ingredientsTextarea.value = '';
-                    showStatus(result.message || 'No text detected by OCR.', false);
+                    showStatus('No text detected by OCR or unexpected backend response.', false);
                 }
             } catch (error) {
-                console.error('Error calling OCR serverless function:', error);
+                console.error('Error calling OCR backend:', error);
                 showStatus(`Network or other error during OCR: ${error.message}`, true);
                 ingredientsTextarea.value = `OCR failed: ${error.message}`;
             } finally {
@@ -329,7 +313,7 @@
             }
         }
 
-        // --- LLM ANALYSIS (Calls Vercel Serverless Function) ---
+        // --- LLM ANALYSIS (Calls Backend for Groq API with Llama 3.3 70B) ---
         analyzeBtn.addEventListener('click', async () => {
             const ingredients = ingredientsTextarea.value.trim();
             if (!ingredients) {
@@ -337,39 +321,44 @@
                 return;
             }
             
-            showStatus('Analyzing ingredients with AI, please wait...', false);
+            showStatus('Analyzing ingredients with AI (via backend), please wait...', false);
             setLoading(analyzeBtnText, analyzeLoader, true, '✨ Analyze Ingredients');
-            analysisOutputDiv.innerHTML = ''; 
+            analysisOutputDiv.innerHTML = '';
 
+            // This is where you would call your backend endpoint for analysis using Groq
+            // Example: const backendAnalysisUrl = '/api/analyze-ingredients';
             try {
-                const response = await fetch('/api/analyze', { 
+                const response = await fetch('/api/analyze-ingredients', { // Replace with your actual backend endpoint
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ ingredientsText: ingredients })
+                    body: JSON.stringify({ ingredients_text: ingredients, model: "llama-3.3-70b-versatile" })
                 });
-                
-                const result = await response.json(); 
 
                 if (!response.ok) {
-                     console.error('Analysis Serverless Function Error:', result);
-                     showStatus(`Analysis Error: ${result.error || "Unknown error from analysis service"}`, true);
-                     analysisOutputDiv.innerHTML = `<p class="text-red-600">Analysis failed: ${result.error || "Unknown"}</p>`;
-                     return; 
+                    const errorResult = await response.json().catch(() => ({ message: "Unknown error from analysis backend." }));
+                    throw new Error(errorResult.message || `Analysis backend request failed with status ${response.status}`);
                 }
-                
-                displayAnalysisResults(result, ingredients);
-                showStatus('Analysis complete!', false);
+
+                const analysisData = await response.json(); // Assuming backend returns the structured JSON from Groq
+
+                if (analysisData.error) { // If your backend wraps Groq errors
+                    showStatus(`Analysis Error from backend: ${analysisData.error}`, true);
+                    analysisOutputDiv.innerHTML = `<p class="text-red-600">Analysis failed: ${analysisData.error}</p>`;
+                } else {
+                    displayAnalysisResults(analysisData, ingredients);
+                    showStatus('Analysis complete!', false);
+                }
 
             } catch (error) {
-                console.error('Error calling analysis serverless function:', error);
+                console.error('Error calling analysis backend:', error);
                 showStatus(`Network or other error during analysis: ${error.message}`, true);
-                analysisOutputDiv.innerHTML = `<p class="text-red-600">An error occurred: ${error.message}. Please try again.</p>`;
+                analysisOutputDiv.innerHTML = `<p class="text-red-600">Analysis request failed: ${error.message}</p>`;
             } finally {
                 setLoading(analyzeBtnText, analyzeLoader, false, '✨ Analyze Ingredients');
             }
         });
 
-        // --- DISPLAY ANALYSIS RESULTS ---
+        // --- DISPLAY ANALYSIS RESULTS (No changes needed here if backend returns the same JSON structure) ---
         function displayAnalysisResults(data, originalIngredients) {
             analysisOutputDiv.innerHTML = ''; 
 
@@ -399,27 +388,22 @@
             analysisOutputDiv.appendChild(ogDiv);
 
             function createListSection(title, items, listClasses = 'list-disc list-inside space-y-1 text-slate-700', itemClasses = '') {
-                if (!items || items.length === 0) {
-                    if (title === 'Potential Side Effects' || title === 'Other Observations' || title === 'Healthier Alternatives:') {
-                         return `<div class="mb-6"><h4 class="text-lg font-semibold text-teal-700 mb-2">${title}</h4><p class="text-sm text-slate-500 italic">None specified.</p></div>`;
-                    }
-                    return '';
-                }
+                if (!items || items.length === 0) return '';
                 let itemsHtml = items.map(item => `<li class="${itemClasses}">${item}</li>`).join('');
                 return `
                     <div class="mb-6">
-                        <h4 class="text-lg font-semibold text-teal-700 mb-2">${title}</h4>
+                        <h4 class="text-lg font-bold text-teal-700 mb-2">${title}</h4>
                         <ul class="${listClasses}">${itemsHtml}</ul>
                     </div>
                 `;
             }
             
-            function createIngredientCategorySection(title, ingredients, colorClass = 'border-slate-500') {
+            function createIngredientCategorySection(title, ingredients, itemBorderColorClass = 'border-slate-500', titleBgColorClass = 'bg-slate-200', titleTextColorClass = 'text-slate-700') {
                 if (!ingredients || ingredients.length === 0) {
-                     return `<div class="mb-4"><h4 class="text-md font-semibold text-teal-700">${title}</h4><p class="text-sm text-slate-500 italic">None identified in this category.</p></div>`;
+                     return `<div class="mb-4"><h4 class="text-lg font-bold ${titleBgColorClass} ${titleTextColorClass} p-3 rounded-md shadow-sm mb-3">${title}</h4><p class="text-sm text-slate-500 italic px-3">None identified in this category.</p></div>`;
                 }
                 let itemsHtml = ingredients.map(ing => `
-                    <li class="mb-3 p-3 bg-white rounded-md shadow-sm border-l-4 ${colorClass}">
+                    <li class="mb-3 p-3 bg-white rounded-md shadow-sm border-l-4 ${itemBorderColorClass}">
                         <strong class="block text-slate-800">${ing.name}</strong>
                         <p class="text-sm text-slate-600 mt-1">${ing.explanation}</p>
                         ${ing.reference_url ? `<a href="${ing.reference_url}" target="_blank" rel="noopener noreferrer" class="text-xs text-sky-600 hover:text-sky-700 hover:underline mt-1 block">Learn more</a>` : ''}
@@ -427,36 +411,36 @@
                 `).join('');
                 return `
                     <div class="mb-6">
-                        <h4 class="text-lg font-semibold text-teal-700 mb-3">${title}</h4>
+                        <h4 class="text-lg font-bold ${titleBgColorClass} ${titleTextColorClass} p-3 rounded-md shadow-sm mb-3">${title}</h4>
                         <ul class="space-y-2">${itemsHtml}</ul>
                     </div>
                 `;
             }
 
-            analysisOutputDiv.innerHTML += createListSection('Potential Side Effects', data.potential_side_effects);
+            analysisOutputDiv.innerHTML += createListSection('Potential Side Effects', data.potential_side_effects, 'list-disc list-inside space-y-1 text-slate-700', 'text-sm');
 
             const ia = data.ingredients_analysis;
             if (ia) {
                 const ingredientsSection = document.createElement('div');
                 ingredientsSection.className = 'p-4 bg-sky-50 rounded-lg shadow-inner';
-                ingredientsSection.innerHTML = `<h3 class="text-xl font-semibold text-sky-700 mb-4">Detailed Ingredient Breakdown</h3>`;
-                ingredientsSection.innerHTML += createIngredientCategorySection('Toxic / Banned', ia.toxic_banned, 'border-red-500');
-                ingredientsSection.innerHTML += createIngredientCategorySection('Bad', ia.bad, 'border-orange-500');
-                ingredientsSection.innerHTML += createIngredientCategorySection('Average', ia.average, 'border-yellow-500');
-                ingredientsSection.innerHTML += createIngredientCategorySection('Good', ia.good, 'border-lime-500');
-                ingredientsSection.innerHTML += createIngredientCategorySection('Healthy', ia.healthy, 'border-green-500');
+                ingredientsSection.innerHTML = `<h3 class="text-xl font-bold text-sky-800 mb-6 text-center">Detailed Ingredient Breakdown</h3>`;
+                ingredientsSection.innerHTML += createIngredientCategorySection('Toxic / Banned', ia.toxic_banned, 'border-red-500', 'bg-red-500', 'text-white');
+                ingredientsSection.innerHTML += createIngredientCategorySection('Bad', ia.bad, 'border-orange-500', 'bg-orange-500', 'text-white');
+                ingredientsSection.innerHTML += createIngredientCategorySection('Average', ia.average, 'border-yellow-500', 'bg-yellow-500', 'text-slate-800');
+                ingredientsSection.innerHTML += createIngredientCategorySection('Good', ia.good, 'border-lime-500', 'bg-lime-500', 'text-slate-800');
+                ingredientsSection.innerHTML += createIngredientCategorySection('Healthy', ia.healthy, 'border-green-500', 'bg-green-500', 'text-white');
                 analysisOutputDiv.appendChild(ingredientsSection);
             }
             
-            analysisOutputDiv.innerHTML += createListSection('Other Observations', data.other_observations);
+            analysisOutputDiv.innerHTML += createListSection('Other Observations', data.other_observations, 'list-disc list-inside space-y-1 text-slate-700', 'text-sm');
 
             if (data.conclusion) {
                 const conclusionDiv = document.createElement('div');
                 conclusionDiv.className = 'mt-6 p-6 bg-teal-50 rounded-xl shadow';
                 conclusionDiv.innerHTML = `
-                    <h3 class="text-xl font-semibold text-teal-700 mb-3">Conclusion & Alternatives</h3>
-                    <p class="text-slate-700 mb-4"><strong class="block text-teal-600">Summary:</strong> ${data.conclusion.summary || "No summary provided."}</p>
-                    ${(data.conclusion.alternatives && data.conclusion.alternatives.length > 0) ? createListSection('Healthier Alternatives:', data.conclusion.alternatives, 'list-disc list-inside space-y-1 text-slate-700') : '<p class="text-sm text-slate-500 italic">No specific alternatives suggested.</p>'}
+                    <h3 class="text-xl font-bold text-teal-700 mb-3">Conclusion & Alternatives</h3>
+                    <p class="text-slate-700 mb-4"><strong class="block text-teal-600">Summary:</strong> ${data.conclusion.summary}</p>
+                    ${data.conclusion.alternatives && data.conclusion.alternatives.length > 0 ? createListSection('Healthier Alternatives:', data.conclusion.alternatives, 'list-disc list-inside space-y-1 text-slate-700', 'text-sm') : '<p class="text-sm text-slate-500 italic">No specific alternatives suggested.</p>'}
                 `;
                 analysisOutputDiv.appendChild(conclusionDiv);
             }
