@@ -7,6 +7,6 @@
     "start": "vercel dev"
   },
   "dependencies": {
-    "groq-sdk": "^0.8.0" // Use the latest stable version
+    "groq-sdk": "^0.8.0"
   }
 }
