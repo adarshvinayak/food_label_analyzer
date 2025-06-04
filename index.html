@@ -7,9 +7,8 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body {
-            font-family: 'Inter', sans-serif; /* Tailwind's default sans-serif is good */
+            font-family: 'Inter', sans-serif;
         }
-        /* Custom scrollbar for better aesthetics if needed */
         ::-webkit-scrollbar {
             width: 8px;
         }
@@ -18,14 +17,14 @@
             border-radius: 10px;
         }
         ::-webkit-scrollbar-thumb {
-            background: #0D9488; /* Teal-700 */
+            background: #0D9488;
             border-radius: 10px;
         }
         ::-webkit-scrollbar-thumb:hover {
-            background: #0F766E; /* Teal-800 */
+            background: #0F766E;
         }
         .tab-button.active {
-            background-color: #0D9488; /* Teal-700 */
+            background-color: #0D9488;
             color: white;
         }
         .tab-button {
@@ -122,10 +121,7 @@
     </div>
 
     <script>
-        // --- CONFIGURATION ---
-        // IMPORTANT: Replace with your actual API keys
-        const GOOGLE_VISION_API_KEY = ""; // Your Google Cloud Vision API Key
-        const GEMINI_API_KEY = ""; // Your Google Generative AI (Gemini) API Key (if not using built-in auth)
+        // --- NO API KEYS STORED IN CLIENT-SIDE SCRIPT ---
 
         // --- DOM ELEMENTS ---
         const tabUpload = document.getElementById('tabUpload');
@@ -158,7 +154,7 @@
             cameraContent.classList.add('hidden');
             tabUpload.classList.add('active');
             tabCamera.classList.remove('active');
-            stopCamera(); // Stop camera if user switches tab
+            stopCamera(); 
         });
 
         tabCamera.addEventListener('click', () => {
@@ -194,10 +190,10 @@
                 reader.onload = (e) => {
                     imagePreview.src = e.target.result;
                     imagePreview.classList.remove('hidden');
-                    ingredientsTextarea.value = ''; // Clear previous text
-                    analysisOutputDiv.innerHTML = ''; // Clear previous results
+                    ingredientsTextarea.value = ''; 
+                    analysisOutputDiv.innerHTML = ''; 
                     showStatus('Image selected. Performing OCR...', false);
-                    performOcr(e.target.result.split(',')[1]); // Pass base64 data
+                    performOcrViaServer(e.target.result.split(',')[1]); // Pass base64 data
                 }
                 reader.readAsDataURL(file);
             } else {
@@ -210,7 +206,15 @@
         startCameraBtn.addEventListener('click', async () => {
             if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
                 try {
-                    cameraStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+                    // Prefer environment (rear) camera
+                    const constraints = { 
+                        video: { 
+                            facingMode: 'environment',
+                            width: { ideal: 1280 }, // Request a reasonable resolution
+                            height: { ideal: 720 }
+                        } 
+                    };
+                    cameraStream = await navigator.mediaDevices.getUserMedia(constraints);
                     cameraFeed.srcObject = cameraStream;
                     cameraFeed.classList.remove('hidden');
                     startCameraBtn.classList.add('hidden');
@@ -218,14 +222,26 @@
                     captureImageBtn.classList.remove('hidden');
                     showStatus('Camera started. Position the ingredients label.', false);
                 } catch (error) {
-                    console.error("Error accessing camera:", error);
-                    showStatus(`Error accessing camera: ${error.name}. Please ensure permissions are granted.`, true);
-                    if (error.name === "NotAllowedError") {
-                         showStatus("Camera access was denied. Please allow camera access in your browser settings and refresh the page.", true);
-                    } else if (error.name === "NotFoundError" || error.name === "DevicesNotFoundError") {
-                        showStatus("No camera found. Please ensure a camera is connected and enabled.", true);
-                    } else {
-                        showStatus("Could not access the camera. Please check your browser settings and ensure a camera is available.", true);
+                    console.warn("Could not get environment camera, trying user (front) camera:", error);
+                    try { // Fallback to user (front) camera if environment fails
+                        const fallbackConstraints = { video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } } };
+                        cameraStream = await navigator.mediaDevices.getUserMedia(fallbackConstraints);
+                        cameraFeed.srcObject = cameraStream;
+                        cameraFeed.classList.remove('hidden');
+                        startCameraBtn.classList.add('hidden');
+                        stopCameraBtn.classList.remove('hidden');
+                        captureImageBtn.classList.remove('hidden');
+                        showStatus('Using front camera. Position the ingredients label.', false);
+                    } catch (fallbackError) {
+                        console.error("Error accessing any camera:", fallbackError);
+                        showStatus(`Error accessing camera: ${fallbackError.name}. Please ensure permissions are granted and a camera is available.`, true);
+                        if (fallbackError.name === "NotAllowedError") {
+                            showStatus("Camera access was denied. Please allow camera access in your browser settings and refresh the page.", true);
+                        } else if (fallbackError.name === "NotFoundError" || fallbackError.name === "DevicesNotFoundError") {
+                            showStatus("No camera found. Please ensure a camera is connected and enabled.", true);
+                        } else {
+                            showStatus("Could not access the camera. Please check your browser settings and ensure a camera is available.", true);
+                        }
                     }
                 }
             } else {
@@ -238,7 +254,7 @@
         function stopCamera() {
             if (cameraStream) {
                 cameraStream.getTracks().forEach(track => track.stop());
-                cameraFeed.srcObject = null; // Clear the video feed
+                cameraFeed.srcObject = null; 
                 cameraStream = null;
                 startCameraBtn.classList.remove('hidden');
                 stopCameraBtn.classList.add('hidden');
@@ -248,77 +264,64 @@
         }
         
         captureImageBtn.addEventListener('click', () => {
-            if (!cameraStream) {
-                showStatus('Camera not active. Please start the camera first.', true);
+            if (!cameraStream || !cameraFeed.srcObject) { // Check if camera is actually streaming
+                showStatus('Camera not active or stream not available. Please start the camera first.', true);
                 return;
             }
+            // Ensure video dimensions are available
+            if (cameraFeed.videoWidth === 0 || cameraFeed.videoHeight === 0) {
+                showStatus('Camera dimensions not yet available. Please wait a moment and try again.', true);
+                return;
+            }
+
             const context = imageCanvas.getContext('2d');
             imageCanvas.width = cameraFeed.videoWidth;
             imageCanvas.height = cameraFeed.videoHeight;
-            // Flip the image back to normal before drawing if it was mirrored for display
+            
             context.save();
-            if (cameraFeed.style.transform === 'scaleX(-1)') { // Check if mirrored
-                context.scale(-1, 1);
-                context.drawImage(cameraFeed, -imageCanvas.width, 0, imageCanvas.width, imageCanvas.height);
-            } else {
-                context.drawImage(cameraFeed, 0, 0, imageCanvas.width, imageCanvas.height);
-            }
+            // If cameraFeed is mirrored for display (scaleX(-1)), we draw it normally onto the canvas.
+            // The actual video stream data is not mirrored.
+            context.drawImage(cameraFeed, 0, 0, imageCanvas.width, imageCanvas.height);
             context.restore();
 
             const imageDataUrl = imageCanvas.toDataURL('image/png');
-            imagePreview.src = imageDataUrl; // Show captured image as preview
+            imagePreview.src = imageDataUrl; 
             imagePreview.classList.remove('hidden');
-            ingredientsTextarea.value = ''; // Clear previous text
-            analysisOutputDiv.innerHTML = ''; // Clear previous results
+            ingredientsTextarea.value = ''; 
+            analysisOutputDiv.innerHTML = ''; 
             showStatus('Image captured. Performing OCR...', false);
-            performOcr(imageDataUrl.split(',')[1]); // Pass base64 data
-            stopCamera(); // Optionally stop camera after capture
+            performOcrViaServer(imageDataUrl.split(',')[1]); // Pass base64 data
+            // stopCamera(); // Optionally stop camera after capture - user might want to take multiple shots
         });
 
-        // --- OCR FUNCTION (Google Cloud Vision API) ---
-        async function performOcr(base64ImageData) {
-            if (!GOOGLE_VISION_API_KEY) {
-                showStatus('Google Vision API Key is not configured. OCR cannot be performed.', true);
-                setLoading(analyzeBtnText, analyzeLoader, false, '✨ Analyze Ingredients');
-                return;
-            }
-            setLoading(analyzeBtnText, analyzeLoader, true, '✨ Analyze Ingredients'); // Use analyze button's loader
+        // --- OCR FUNCTION (Calls Vercel Serverless Function) ---
+        async function performOcrViaServer(base64ImageData) {
+            setLoading(analyzeBtnText, analyzeLoader, true, '✨ Analyze Ingredients');
             
-            const visionApiUrl = `https://vision.googleapis.com/v1/images:annotate?key=${GOOGLE_VISION_API_KEY}`;
-            const requestPayload = {
-                requests: [{
-                    image: { content: base64ImageData },
-                    features: [{ type: 'TEXT_DETECTION' }]
-                }]
-            };
-
             try {
-                const response = await fetch(visionApiUrl, {
+                const response = await fetch('/api/ocr', { // Calls your Vercel serverless function
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(requestPayload)
+                    body: JSON.stringify({ imageBase64: base64ImageData })
                 });
-                const result = await response.json();
+                const result = await response.json(); 
 
-                if (!response.ok || result.error || (result.responses && result.responses[0].error)) {
-                    const errorMsg = result.error?.message || result.responses?.[0]?.error?.message || "Unknown Vision API error";
-                    console.error('Google Vision API Error:', result);
-                    showStatus(`OCR Error: ${errorMsg}`, true);
-                    ingredientsTextarea.value = `OCR failed: ${errorMsg}`;
-                    setLoading(analyzeBtnText, analyzeLoader, false, '✨ Analyze Ingredients');
-                    return;
+                if (!response.ok) {
+                    console.error('OCR Serverless Function Error:', result);
+                    showStatus(`OCR Error: ${result.error || "Unknown error from OCR service"}`, true);
+                    ingredientsTextarea.value = `OCR failed: ${result.error || "Unknown"}`;
+                    return; 
                 }
                 
-                if (result.responses && result.responses[0] && result.responses[0].fullTextAnnotation) {
-                    const detectedText = result.responses[0].fullTextAnnotation.text;
-                    ingredientsTextarea.value = detectedText;
+                if (result.text) {
+                    ingredientsTextarea.value = result.text;
                     showStatus('OCR successful! Review the text and click Analyze.', false);
                 } else {
                     ingredientsTextarea.value = '';
-                    showStatus('No text detected by OCR or an unexpected response format.', false);
+                    showStatus(result.message || 'No text detected by OCR.', false);
                 }
             } catch (error) {
-                console.error('Error calling Google Vision API:', error);
+                console.error('Error calling OCR serverless function:', error);
                 showStatus(`Network or other error during OCR: ${error.message}`, true);
                 ingredientsTextarea.value = `OCR failed: ${error.message}`;
             } finally {
@@ -326,7 +329,7 @@
             }
         }
 
-        // --- LLM ANALYSIS (Gemini API) ---
+        // --- LLM ANALYSIS (Calls Vercel Serverless Function) ---
         analyzeBtn.addEventListener('click', async () => {
             const ingredients = ingredientsTextarea.value.trim();
             if (!ingredients) {
@@ -334,140 +337,33 @@
                 return;
             }
             
-            if (!GEMINI_API_KEY && !window.trustedTypes) { // Second condition for built-in auth
-                 showStatus('Gemini API Key is not configured. Analysis cannot be performed.', true);
-                 return;
-            }
-
             showStatus('Analyzing ingredients with AI, please wait...', false);
             setLoading(analyzeBtnText, analyzeLoader, true, '✨ Analyze Ingredients');
-            analysisOutputDiv.innerHTML = ''; // Clear previous results
+            analysisOutputDiv.innerHTML = ''; 
 
-            const geminiApiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
-            
-            const prompt = `
-You are an expert food ingredient analyst. Analyze the following list of ingredients and provide a comprehensive health assessment.
-Your response MUST be a single, valid JSON object. Do not include any text before or after the JSON structure (e.g., no "'''json" markers or explanations).
-
-INGREDIENTS:
-${ingredients}
-
-JSON Structure Expected:
-{
-  "overall_health_score": <integer, 0-100, representing overall healthiness>,
-  "potential_side_effects": ["<string effect1>", "<string effect2>", ... <array of strings describing potential side effects>],
-  "ingredients_analysis": {
-    "toxic_banned": [
-      {"name": "<string ingredient_name>", "explanation": "<string explanation: what it is, why used, health effects>", "reference_url": "<optional string URL or null>"}
-    ],
-    "bad": [
-      {"name": "<string ingredient_name>", "explanation": "<string explanation>", "reference_url": "<optional string URL or null>"}
-    ],
-    "average": [
-      {"name": "<string ingredient_name>", "explanation": "<string explanation>", "reference_url": "<optional string URL or null>"}
-    ],
-    "good": [
-      {"name": "<string ingredient_name>", "explanation": "<string explanation>", "reference_url": "<optional string URL or null>"}
-    ],
-    "healthy": [
-      {"name": "<string ingredient_name>", "explanation": "<string explanation>", "reference_url": "<optional string URL or null>"}
-    ]
-  },
-  "other_observations": ["<string observation1>", "<string observation2>", ... <array of strings for other relevant notes>],
-  "conclusion": {
-    "summary": "<string overall summary of the product's healthiness based on ingredients>",
-    "alternatives": ["<string healthier alternative product type or ingredient suggestion1>", "<string alternative2>", ... <array of strings>]
-  }
-}
-
-Ensure all string values are properly escaped for JSON. If a category (e.g., "toxic_banned") has no ingredients, provide an empty array [].
-Base your analysis on scientific evidence and general nutritional guidelines. The overall_health_score should reflect the balance of healthy versus unhealthy ingredients.
-For "reference_url", provide a URL to a reputable source if available for "toxic_banned" items, otherwise use null. For other categories, reference_url is optional.
-            `;
-
-            const payload = {
-              contents: [{ role: "user", parts: [{ text: prompt }] }],
-              generationConfig: {
-                responseMimeType: "application/json",
-                // Define the schema for the expected JSON response
-                responseSchema: {
-                  type: "OBJECT",
-                  properties: {
-                    "overall_health_score": { "type": "NUMBER" },
-                    "potential_side_effects": { "type": "ARRAY", "items": { "type": "STRING" } },
-                    "ingredients_analysis": {
-                      "type": "OBJECT",
-                      properties: {
-                        "toxic_banned": {
-                          "type": "ARRAY",
-                          "items": {
-                            "type": "OBJECT",
-                            "properties": {
-                              "name": { "type": "STRING" },
-                              "explanation": { "type": "STRING" },
-                              "reference_url": { "type": "STRING", "nullable": true, "description": "URL to a reputable source or null" }
-                            },
-                            "required": ["name", "explanation"]
-                          }
-                        },
-                        "bad": { /* Same structure as toxic_banned */ "type": "ARRAY", "items": { "type": "OBJECT", "properties": { "name": { "type": "STRING" }, "explanation": { "type": "STRING" }, "reference_url": { "type": "STRING", "nullable": true } }, "required": ["name", "explanation"] } },
-                        "average": { /* Same structure as toxic_banned */ "type": "ARRAY", "items": { "type": "OBJECT", "properties": { "name": { "type": "STRING" }, "explanation": { "type": "STRING" }, "reference_url": { "type": "STRING", "nullable": true } }, "required": ["name", "explanation"] } },
-                        "good": { /* Same structure as toxic_banned */ "type": "ARRAY", "items": { "type": "OBJECT", "properties": { "name": { "type": "STRING" }, "explanation": { "type": "STRING" }, "reference_url": { "type": "STRING", "nullable": true } }, "required": ["name", "explanation"] } },
-                        "healthy": { /* Same structure as toxic_banned */ "type": "ARRAY", "items": { "type": "OBJECT", "properties": { "name": { "type": "STRING" }, "explanation": { "type": "STRING" }, "reference_url": { "type": "STRING", "nullable": true } }, "required": ["name", "explanation"] } }
-                      },
-                       "required": ["toxic_banned", "bad", "average", "good", "healthy"]
-                    },
-                    "other_observations": { "type": "ARRAY", "items": { "type": "STRING" } },
-                    "conclusion": {
-                      "type": "OBJECT",
-                      properties: {
-                        "summary": { "type": "STRING" },
-                        "alternatives": { "type": "ARRAY", "items": { "type": "STRING" } }
-                      },
-                      "required": ["summary", "alternatives"]
-                    }
-                  },
-                  "required": ["overall_health_score", "potential_side_effects", "ingredients_analysis", "other_observations", "conclusion"]
-                }
-              }
-            };
-            
             try {
-                const response = await fetch(geminiApiUrl, {
+                const response = await fetch('/api/analyze', { 
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
+                    body: JSON.stringify({ ingredientsText: ingredients })
                 });
-                const result = await response.json();
+                
+                const result = await response.json(); 
 
-                if (!response.ok || (result.candidates && result.candidates.length > 0 && result.candidates[0].finishReason !== "STOP" && result.candidates[0].finishReason !== undefined) || result.error) {
-                     const errorDetail = result.error?.message || (result.promptFeedback?.blockReason?.toString()) || (result.candidates?.[0]?.finishReason) || "Unknown Gemini API error";
-                     console.error('Gemini API Error Response:', result);
-                     showStatus(`Analysis Error: ${errorDetail}. The model might have been blocked or an API issue occurred.`, true);
-                     analysisOutputDiv.innerHTML = `<p class="text-red-600">Analysis failed: ${errorDetail}</p>`;
-                     return;
+                if (!response.ok) {
+                     console.error('Analysis Serverless Function Error:', result);
+                     showStatus(`Analysis Error: ${result.error || "Unknown error from analysis service"}`, true);
+                     analysisOutputDiv.innerHTML = `<p class="text-red-600">Analysis failed: ${result.error || "Unknown"}</p>`;
+                     return; 
                 }
-
-                if (result.candidates && result.candidates[0].content && result.candidates[0].content.parts && result.candidates[0].content.parts[0].text) {
-                    const jsonText = result.candidates[0].content.parts[0].text;
-                    try {
-                        const analysisData = JSON.parse(jsonText);
-                        displayAnalysisResults(analysisData, ingredients);
-                        showStatus('Analysis complete!', false);
-                    } catch (parseError) {
-                        console.error("Error parsing JSON from Gemini:", parseError, "\nReceived text:", jsonText);
-                        showStatus('Error processing analysis results: Could not parse JSON response from AI.', true);
-                        analysisOutputDiv.innerHTML = `<p class="text-red-600 font-semibold">Error: Failed to parse AI's response.</p><p class="text-xs text-slate-500 mt-2">Received (partial):</p><pre class="bg-slate-100 p-2 rounded text-xs whitespace-pre-wrap">${jsonText.substring(0, 500)}...</pre>`;
-                    }
-                } else {
-                    console.error('Unexpected Gemini API response structure:', result);
-                    showStatus('Analysis failed: Unexpected response structure from AI.', true);
-                    analysisOutputDiv.innerHTML = `<p class="text-red-600">Analysis failed due to unexpected AI response format.</p>`;
-                }
+                
+                displayAnalysisResults(result, ingredients);
+                showStatus('Analysis complete!', false);
 
             } catch (error) {
-                console.error('Error calling Gemini API:', error);
+                console.error('Error calling analysis serverless function:', error);
                 showStatus(`Network or other error during analysis: ${error.message}`, true);
+                analysisOutputDiv.innerHTML = `<p class="text-red-600">An error occurred: ${error.message}. Please try again.</p>`;
             } finally {
                 setLoading(analyzeBtnText, analyzeLoader, false, '✨ Analyze Ingredients');
             }
@@ -475,9 +371,8 @@ For "reference_url", provide a URL to a reputable source if available for "toxic
 
         // --- DISPLAY ANALYSIS RESULTS ---
         function displayAnalysisResults(data, originalIngredients) {
-            analysisOutputDiv.innerHTML = ''; // Clear previous
+            analysisOutputDiv.innerHTML = ''; 
 
-            // Overall Score
             const score = data.overall_health_score !== undefined ? data.overall_health_score : 'N/A';
             let scoreColor = 'text-slate-700';
             if (typeof score === 'number') {
@@ -493,7 +388,6 @@ For "reference_url", provide a URL to a reputable source if available for "toxic
             `;
             analysisOutputDiv.appendChild(scoreDiv);
 
-            // Original Ingredients (collapsible)
             const ogDiv = document.createElement('div');
             ogDiv.className = 'mb-6 bg-slate-50 p-4 rounded-lg shadow';
             ogDiv.innerHTML = `
@@ -504,10 +398,13 @@ For "reference_url", provide a URL to a reputable source if available for "toxic
             `;
             analysisOutputDiv.appendChild(ogDiv);
 
-
-            // Helper to create list sections
             function createListSection(title, items, listClasses = 'list-disc list-inside space-y-1 text-slate-700', itemClasses = '') {
-                if (!items || items.length === 0) return '';
+                if (!items || items.length === 0) {
+                    if (title === 'Potential Side Effects' || title === 'Other Observations' || title === 'Healthier Alternatives:') {
+                         return `<div class="mb-6"><h4 class="text-lg font-semibold text-teal-700 mb-2">${title}</h4><p class="text-sm text-slate-500 italic">None specified.</p></div>`;
+                    }
+                    return '';
+                }
                 let itemsHtml = items.map(item => `<li class="${itemClasses}">${item}</li>`).join('');
                 return `
                     <div class="mb-6">
@@ -517,7 +414,6 @@ For "reference_url", provide a URL to a reputable source if available for "toxic
                 `;
             }
             
-            // Helper to create ingredient category sections
             function createIngredientCategorySection(title, ingredients, colorClass = 'border-slate-500') {
                 if (!ingredients || ingredients.length === 0) {
                      return `<div class="mb-4"><h4 class="text-md font-semibold text-teal-700">${title}</h4><p class="text-sm text-slate-500 italic">None identified in this category.</p></div>`;
@@ -559,8 +455,8 @@ For "reference_url", provide a URL to a reputable source if available for "toxic
                 conclusionDiv.className = 'mt-6 p-6 bg-teal-50 rounded-xl shadow';
                 conclusionDiv.innerHTML = `
                     <h3 class="text-xl font-semibold text-teal-700 mb-3">Conclusion & Alternatives</h3>
-                    <p class="text-slate-700 mb-4"><strong class="block text-teal-600">Summary:</strong> ${data.conclusion.summary}</p>
-                    ${data.conclusion.alternatives && data.conclusion.alternatives.length > 0 ? createListSection('Healthier Alternatives:', data.conclusion.alternatives, 'list-disc list-inside space-y-1 text-slate-700') : '<p class="text-sm text-slate-500 italic">No specific alternatives suggested.</p>'}
+                    <p class="text-slate-700 mb-4"><strong class="block text-teal-600">Summary:</strong> ${data.conclusion.summary || "No summary provided."}</p>
+                    ${(data.conclusion.alternatives && data.conclusion.alternatives.length > 0) ? createListSection('Healthier Alternatives:', data.conclusion.alternatives, 'list-disc list-inside space-y-1 text-slate-700') : '<p class="text-sm text-slate-500 italic">No specific alternatives suggested.</p>'}
                 `;
                 analysisOutputDiv.appendChild(conclusionDiv);
             }
