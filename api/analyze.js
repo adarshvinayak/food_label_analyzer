@@ -3,7 +3,6 @@
 // Make sure to install groq-sdk: npm install groq-sdk
 
 import Groq from 'groq-sdk';
-
 export default async function handler(request, response) {
     if (request.method !== 'POST') {
         response.setHeader('Allow', ['POST']);
@@ -11,7 +10,8 @@ export default async function handler(request, response) {
         return;
     }
 
-    const { ingredientsText, model: requestedModel } = request.body; // Client can suggest a model
+    // FIX: Changed 'ingredientsText' to 'ingredients_text' to match frontend request body
+    const { ingredients_text: ingredientsText, model: requestedModel } = request.body; 
 
     if (!ingredientsText || ingredientsText.trim() === '') {
         response.status(400).json({ error: 'Missing ingredientsText in request body' });
@@ -20,7 +20,6 @@ export default async function handler(request, response) {
 
     // Get API Key from Vercel Environment Variables
     const GROQ_API_KEY = process.env.GROQ_API_KEY;
-
     if (!GROQ_API_KEY) {
         console.error('Groq API Key is not configured in Vercel environment variables.');
         response.status(500).json({ error: 'Analysis service is not configured on the server (missing API key).' });
@@ -28,13 +27,14 @@ export default async function handler(request, response) {
     }
 
     const groq = new Groq({ apiKey: GROQ_API_KEY });
-    const modelToUse = requestedModel || "llama-3.3-70b-versatile"; // Default to llama-3.3-70b-versatile
+    const modelToUse = requestedModel || "llama-3.3-70b-versatile";
+    // Default to llama-3.3-70b-versatile
 
     // The prompt remains the same as it defines the task and expected JSON output structure
     const prompt = `
-You are an expert food ingredient analyst. Analyze the following list of ingredients and provide a comprehensive health assessment.
+You are an expert food ingredient analyst.
+Analyze the following list of ingredients and provide a comprehensive health assessment.
 Your response MUST be a single, valid JSON object. Do not include any text before or after the JSON structure (e.g., no "'''json" markers or explanations).
-
 INGREDIENTS:
 ${ingredientsText}
 
@@ -66,9 +66,12 @@ JSON Structure Expected:
   }
 }
 
-Ensure all string values are properly escaped for JSON. If a category (e.g., "toxic_banned") has no ingredients, provide an empty array [].
-Base your analysis on scientific evidence and general nutritional guidelines. The overall_health_score should reflect the balance of healthy versus unhealthy ingredients.
-For "reference_url", provide a URL to a reputable source if available for "toxic_banned" items, otherwise use null. For other categories, reference_url is optional.
+Ensure all string values are properly escaped for JSON.
+If a category (e.g., "toxic_banned") has no ingredients, provide an empty array [].
+Base your analysis on scientific evidence and general nutritional guidelines.
+The overall_health_score should reflect the balance of healthy versus unhealthy ingredients.
+For "reference_url", provide a URL to a reputable source if available for "toxic_banned" items, otherwise use null.
+For other categories, reference_url is optional.
     `;
 
     try {
@@ -90,16 +93,16 @@ For "reference_url", provide a URL to a reputable source if available for "toxic
             // This is often done via a parameter like `response_format: { type: "json_object" }`
             // Check Groq's latest SDK/API documentation for the exact way to request JSON mode.
             // If not available, the strong prompting is key.
+            // Consider adding response_format: { type: "json_object" } if your Groq SDK version supports it for stricter JSON output.
         });
 
         const responseContent = chatCompletion.choices[0]?.message?.content;
-
         if (!responseContent) {
             console.error('Groq API returned empty or unexpected content structure:', chatCompletion);
             response.status(500).json({ error: 'Analysis failed: No content received from AI.' });
             return;
         }
-        
+
         // Sometimes models might still wrap their JSON in markdown, try to strip it.
         let cleanedJsonText = responseContent.trim();
         if (cleanedJsonText.startsWith("```json")) {
@@ -109,8 +112,6 @@ For "reference_url", provide a URL to a reputable source if available for "toxic
             }
         }
         cleanedJsonText = cleanedJsonText.trim();
-
-
         try {
             const analysisData = JSON.parse(cleanedJsonText);
             response.status(200).json(analysisData);
