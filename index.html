@@ -205,7 +205,7 @@
         startCameraBtn.addEventListener('click', async () => {
             if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
                 try {
-                    cameraStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+                    cameraStream = await navigator.mediaDevices.getUserMedia({ video: true });
                     cameraFeed.srcObject = cameraStream;
                     cameraFeed.classList.remove('hidden');
                     startCameraBtn.classList.add('hidden');
