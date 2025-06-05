@@ -32,6 +32,10 @@
         }
         #cameraFeed {
             transform: scaleX(-1); /* Mirror mode for selfie view */
+            /* Add this to ensure the video scales correctly within its container */
+            max-width: 100%;
+            height: auto;
+            display: block; /* Remove any default inline margins */
         }
         .loader {
             border: 4px solid #f3f3f3;
@@ -87,6 +91,7 @@
                     </div>
                     <div class="bg-slate-200 rounded-lg overflow-hidden shadow-inner aspect-video max-h-[400px] mx-auto">
                         <video id="cameraFeed" playsinline class="w-full h-full object-cover"></video>
+                        <div id="cameraStatusMessage" class="text-center text-sm text-red-500 mt-2 hidden"></div>
                     </div>
                     <canvas id="imageCanvas" class="hidden"></canvas> </div>
             </div>
@@ -118,7 +123,7 @@
     <script>
         // --- NO API KEYS ARE STORED ON THE CLIENT-SIDE ---
         // API calls are now directed to backend endpoints.
-        // You need to implement these backend endpoints (/api/perform-ocr and /api/analyze-ingredients)
+        // You need to implement these backend endpoints (/api/ocr and /api/analyze)
         // which will securely handle your API keys and make the actual calls to
         // Google Vision API and Groq API respectively.
 
@@ -136,6 +141,7 @@
         const captureImageBtn = document.getElementById('captureImageBtn');
         const cameraFeed = document.getElementById('cameraFeed');
         const imageCanvas = document.getElementById('imageCanvas');
+        const cameraStatusMessageDiv = document.getElementById('cameraStatusMessage'); // NEW: For camera-specific errors
         
         const ingredientsTextarea = document.getElementById('ingredientsText');
         const analyzeBtn = document.getElementById('analyzeBtn');
@@ -153,7 +159,8 @@
             cameraContent.classList.add('hidden');
             tabUpload.classList.add('active');
             tabCamera.classList.remove('active');
-            stopCamera();
+            stopCamera(); // Ensure camera is stopped when switching tabs
+            clearCameraStatus(); // Clear any camera errors
         });
 
         tabCamera.addEventListener('click', () => {
@@ -161,12 +168,24 @@
             uploadContent.classList.add('hidden');
             tabCamera.classList.add('active');
             tabUpload.classList.remove('active');
+            // Do not auto-start camera here, let user click 'Start Camera'
+            // showStatus('Click "Start Camera" to begin scanning ingredients.', false); // Give initial instruction
         });
 
         // --- STATUS & LOADING ---
         function showStatus(message, isError = false) {
             statusMessageDiv.textContent = message;
             statusMessageDiv.className = `mb-6 p-4 rounded-lg text-sm ${isError ? 'bg-red-100 text-red-700' : 'bg-sky-100 text-sky-700'}`;
+        }
+
+        function showCameraError(message) { // NEW FUNCTION: For camera-specific errors
+            cameraStatusMessageDiv.textContent = message;
+            cameraStatusMessageDiv.classList.remove('hidden');
+        }
+
+        function clearCameraStatus() { // NEW FUNCTION: Clear camera errors
+            cameraStatusMessageDiv.textContent = '';
+            cameraStatusMessageDiv.classList.add('hidden');
         }
 
         function setLoading(buttonTextElement, loaderElement, isLoading, defaultText) {
@@ -192,7 +211,8 @@
                     ingredientsTextarea.value = ''; 
                     analysisOutputDiv.innerHTML = '';
                     showStatus('Image selected. Performing OCR via backend...', false);
-                    performOcrWithBackend(e.target.result.split(',')[1]); // Pass base64 data
+                    // Pass base64 data, remove the data URL prefix
+                    performOcrWithBackend(e.target.result.split(',')[1]); 
                 }
                 reader.readAsDataURL(file);
             } else {
@@ -203,28 +223,73 @@
 
         // --- CAMERA HANDLING ---
         startCameraBtn.addEventListener('click', async () => {
+            clearCameraStatus(); // Clear previous errors
+            showStatus('Attempting to start camera...', false);
+            // Disable start button immediately to prevent multiple clicks
+            startCameraBtn.disabled = true;
+
             if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
                 try {
-                    cameraStream = await navigator.mediaDevices.getUserMedia({ video: true });
-                    cameraFeed.srcObject = cameraStream;
-                    cameraFeed.classList.remove('hidden');
-                    startCameraBtn.classList.add('hidden');
-                    stopCameraBtn.classList.remove('hidden');
-                    captureImageBtn.classList.remove('hidden');
-                    showStatus('Camera started. Position the ingredients label.', false);
+                    // Reworked constraints for better compatibility:
+                    // Try 'environment' first for rear camera, then fall back to 'user' for front.
+                    // If both fail, try generic 'true'.
+                    let constraints = { video: { facingMode: 'environment' } }; // Try rear camera first
+
+                    try {
+                        cameraStream = await navigator.mediaDevices.getUserMedia(constraints);
+                    } catch (e) {
+                        // If 'environment' fails, try 'user' (front camera)
+                        console.warn("Could not access 'environment' camera, trying 'user' camera.", e);
+                        constraints = { video: { facingMode: 'user' } };
+                        cameraStream = await navigator.mediaDevices.getUserMedia(constraints);
+                    }
+                    
+                    // Fallback to generic video:true if specific facingModes fail
+                    if (!cameraStream) {
+                        console.warn("Could not access 'user' camera, trying generic video:true.");
+                        constraints = { video: true };
+                        cameraStream = await navigator.mediaDevices.getUserMedia(constraints);
+                    }
+
+
+                    if (cameraStream) {
+                        cameraFeed.srcObject = cameraStream;
+                        cameraFeed.classList.remove('hidden');
+                        startCameraBtn.classList.add('hidden');
+                        stopCameraBtn.classList.remove('hidden');
+                        captureImageBtn.classList.remove('hidden');
+                        captureImageBtn.disabled = false; // Enable capture
+                        showStatus('Camera started. Position the ingredients label.', false);
+                    } else {
+                        // This case should ideally be caught by the catch block, but as a safeguard
+                        showCameraError('Failed to get camera stream. No camera available or accessible.');
+                        showStatus('Camera failed to start.', true);
+                        startCameraBtn.disabled = false; // Re-enable if no stream
+                    }
+
                 } catch (error) {
                     console.error("Error accessing camera:", error);
-                    showStatus(`Error accessing camera: ${error.name}. Please ensure permissions are granted.`, true);
-                     if (error.name === "NotAllowedError") {
-                         showStatus("Camera access was denied. Please allow camera access in your browser settings and refresh the page.", true);
+                    let errorMessage = "Could not access the camera. Please check your browser settings and ensure a camera is available.";
+                    
+                    if (error.name === "NotAllowedError" || error.name === "SecurityError") {
+                        errorMessage = "Camera access was denied. Please allow camera access in your browser settings and refresh the page.";
                     } else if (error.name === "NotFoundError" || error.name === "DevicesNotFoundError") {
-                        showStatus("No camera found. Please ensure a camera is connected and enabled.", true);
-                    } else {
-                        showStatus("Could not access the camera. Please check your browser settings and ensure a camera is available.", true);
+                        errorMessage = "No camera found on your device. Please ensure a camera is connected and enabled.";
+                    } else if (error.name === "AbortError") {
+                        errorMessage = "Camera access was aborted. Another application might be using the camera, or it's temporarily unavailable.";
+                    } else if (error.name === "NotReadableError") {
+                        errorMessage = "Camera is already in use or unavailable. Please close other applications using the camera.";
                     }
+
+                    showCameraError(errorMessage); // Display error specific to camera area
+                    showStatus(`Camera failed to start: ${errorMessage}`, true);
+                    startCameraBtn.disabled = false; // Re-enable start button on failure
+                    stopCamera(); // Ensure stream is stopped in case of partial success
                 }
             } else {
+                showCameraError('Camera API (getUserMedia) not supported by your browser.');
                 showStatus('Camera API not supported by your browser.', true);
+                startCameraBtn.disabled = false; // Re-enable if API not supported
             }
         });
 
@@ -232,31 +297,41 @@
 
         function stopCamera() {
             if (cameraStream) {
-                cameraStream.getTracks().forEach(track => track.stop());
+                cameraStream.getTracks().forEach(track => {
+                    track.stop(); // Stop all tracks to release the camera
+                });
                 cameraFeed.srcObject = null;
                 cameraStream = null;
-                startCameraBtn.classList.remove('hidden');
-                stopCameraBtn.classList.add('hidden');
-                captureImageBtn.classList.add('hidden');
-                showStatus('Camera stopped.', false);
+                cameraFeed.classList.add('hidden'); // Hide video feed
             }
+            startCameraBtn.classList.remove('hidden');
+            startCameraBtn.disabled = false; // Ensure start button is re-enabled
+            stopCameraBtn.classList.add('hidden');
+            captureImageBtn.classList.add('hidden');
+            captureImageBtn.disabled = true; // Disable capture
+            showStatus('Camera stopped.', false);
+            clearCameraStatus(); // Clear any camera-related messages
         }
         
         captureImageBtn.addEventListener('click', () => {
-            if (!cameraStream) {
-                showStatus('Camera not active. Please start the camera first.', true);
+            if (!cameraStream || cameraFeed.videoWidth === 0) { // Check if video is actually playing
+                showCameraError('Camera not active or video feed is empty. Please ensure camera is streaming.');
+                showStatus('Cannot capture: Camera not ready.', true);
                 return;
             }
+            
             const context = imageCanvas.getContext('2d');
-            imageCanvas.width = cameraFeed.videoWidth;
+            // Set canvas dimensions to match video feed, important for proper capture
+            imageCanvas.width = cameraFeed.videoWidth; 
             imageCanvas.height = cameraFeed.videoHeight;
+
+            // Apply mirror transformation only if the video is mirrored for selfie view
             context.save();
             if (cameraFeed.style.transform === 'scaleX(-1)') {
+                context.translate(imageCanvas.width, 0);
                 context.scale(-1, 1);
-                context.drawImage(cameraFeed, -imageCanvas.width, 0, imageCanvas.width, imageCanvas.height);
-            } else {
-                context.drawImage(cameraFeed, 0, 0, imageCanvas.width, imageCanvas.height);
             }
+            context.drawImage(cameraFeed, 0, 0, imageCanvas.width, imageCanvas.height);
             context.restore();
 
             const imageDataUrl = imageCanvas.toDataURL('image/png');
@@ -266,20 +341,19 @@
             analysisOutputDiv.innerHTML = ''; 
             showStatus('Image captured. Performing OCR via backend...', false);
             performOcrWithBackend(imageDataUrl.split(',')[1]); // Pass base64 data
-            stopCamera(); 
+            stopCamera(); // Stop camera after capturing
         });
 
         // --- OCR FUNCTION (Calls Backend) ---
         async function performOcrWithBackend(base64ImageData) {
             setLoading(analyzeBtnText, analyzeLoader, true, '✨ Analyze Ingredients');
             
-            // This is where you would call your backend endpoint for OCR
-            // FIX: Corrected endpoint from '/api/perform-ocr' to '/api/ocr' to match Vercel function name
             try {
+                // FIX: Corrected endpoint from '/api/perform-ocr' to '/api/ocr' to match Vercel function name
                 const response = await fetch('/api/ocr', { 
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ image_data: base64ImageData }) // Frontend sends 'image_data'
+                    body: JSON.stringify({ image_data: base64ImageData }) 
                 });
                 
                 if (!response.ok) {
@@ -287,7 +361,7 @@
                     throw new Error(errorResult.message || `OCR backend request failed with status ${response.status}`);
                 }
                 
-                const result = await response.json(); // Assuming backend returns { "text": "detected_text" } or { "error": "message" }
+                const result = await response.json(); 
 
                 if (result.error) {
                     showStatus(`OCR Error from backend: ${result.error}`, true);
@@ -320,13 +394,12 @@
             setLoading(analyzeBtnText, analyzeLoader, true, '✨ Analyze Ingredients');
             analysisOutputDiv.innerHTML = '';
 
-            // This is where you would call your backend endpoint for analysis using Groq
-            // FIX: Corrected endpoint from '/api/analyze-ingredients' to '/api/analyze' to match Vercel function name
             try {
+                // FIX: Corrected endpoint from '/api/analyze-ingredients' to '/api/analyze' to match Vercel function name
                 const response = await fetch('/api/analyze', { 
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ ingredients_text: ingredients, model: "llama-3.3-70b-versatile" }) // Frontend sends 'ingredients_text'
+                    body: JSON.stringify({ ingredients_text: ingredients, model: "llama-3.3-70b-versatile" }) 
                 });
 
                 if (!response.ok) {
@@ -334,9 +407,9 @@
                     throw new Error(errorResult.message || `Analysis backend request failed with status ${response.status}`);
                 }
 
-                const analysisData = await response.json(); // Assuming backend returns the structured JSON from Groq
+                const analysisData = await response.json(); 
 
-                if (analysisData.error) { // If your backend wraps Groq errors
+                if (analysisData.error) { 
                     showStatus(`Analysis Error from backend: ${analysisData.error}`, true);
                     analysisOutputDiv.innerHTML = `<p class="text-red-600">Analysis failed: ${analysisData.error}</p>`;
                 } else {
@@ -353,7 +426,7 @@
             }
         });
 
-        // --- DISPLAY ANALYSIS RESULTS (No changes needed here if backend returns the same JSON structure) ---
+        // --- DISPLAY ANALYSIS RESULTS ---
         function displayAnalysisResults(data, originalIngredients) {
             analysisOutputDiv.innerHTML = ''; 
 
