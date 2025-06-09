@@ -84,16 +84,22 @@
                 </div>
 
                 <div id="cameraContent" class="py-6 hidden">
-                    <div class="flex flex-col sm:flex-row gap-4 mb-4">
-                        <button id="startCameraBtn" class="flex-1 bg-sky-500 hover:bg-sky-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md transition duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-sky-400">Start Camera</button>
-                        <button id="stopCameraBtn" class="flex-1 bg-orange-500 hover:bg-orange-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md transition duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-orange-400 hidden">Stop Camera</button>
-                        <button id="captureImageBtn" class="flex-1 bg-green-500 hover:bg-green-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md transition duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-green-400 hidden">Capture Image</button>
+                    <div class="flex flex-col gap-4">
+                        <div class="flex flex-col sm:flex-row gap-4 mb-4">
+                            <button id="startCameraBtn" class="flex-1 bg-sky-500 hover:bg-sky-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md transition duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-sky-400">Start Camera</button>
+                            <button id="stopCameraBtn" class="flex-1 bg-orange-500 hover:bg-orange-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md transition duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-orange-400 hidden">Stop Camera</button>
+                            <button id="switchCameraBtn" class="flex-1 bg-purple-500 hover:bg-purple-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md transition duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-purple-400 hidden">🔄 Switch Camera</button>
+                        </div>
+                        <div class="bg-slate-200 rounded-lg overflow-hidden shadow-inner aspect-video max-h-[400px] mx-auto">
+                            <video id="cameraFeed" playsinline class="w-full h-full object-cover"></video>
+                            <div id="cameraStatusMessage" class="text-center text-sm text-red-500 mt-2 hidden"></div>
+                        </div>
+                        <button id="captureImageBtn" class="w-full bg-green-500 hover:bg-green-600 text-white font-semibold py-3 px-6 rounded-lg shadow-md transition duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-green-400 hidden">
+                            📸 Capture Image
+                        </button>
+                        <canvas id="imageCanvas" class="hidden"></canvas>
                     </div>
-                    <div class="bg-slate-200 rounded-lg overflow-hidden shadow-inner aspect-video max-h-[400px] mx-auto">
-                        <video id="cameraFeed" playsinline class="w-full h-full object-cover"></video>
-                        <div id="cameraStatusMessage" class="text-center text-sm text-red-500 mt-2 hidden"></div>
-                    </div>
-                    <canvas id="imageCanvas" class="hidden"></canvas> </div>
+                </div>
             </div>
         </section>
 
@@ -152,7 +158,10 @@
         const analysisOutputDiv = document.getElementById('analysisOutput');
 
         let cameraStream = null;
-        let currentFacingMode = 'environment'; // Track current camera mode
+        let currentFacingMode = 'environment';
+
+        // Update the camera feed style to handle orientation
+        cameraFeed.style.transform = currentFacingMode === 'user' ? 'scaleX(-1)' : 'none';
 
         // --- TAB SWITCHING LOGIC ---
         tabUpload.addEventListener('click', () => {
@@ -240,6 +249,10 @@
                 cameraStream = await navigator.mediaDevices.getUserMedia(constraints);
                 cameraFeed.srcObject = cameraStream;
                 
+                // Update transform based on camera mode
+                cameraFeed.style.transform = facingMode === 'user' ? 'scaleX(-1)' : 'none';
+                currentFacingMode = facingMode;
+                
                 return new Promise((resolve) => {
                     cameraFeed.onloadedmetadata = () => {
                         cameraFeed.play()
@@ -263,17 +276,11 @@
             }
         }
 
-        // Add camera switch button
-        const switchCameraBtn = document.createElement('button');
-        switchCameraBtn.id = 'switchCameraBtn';
-        switchCameraBtn.className = 'flex-1 bg-purple-500 hover:bg-purple-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md transition duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-purple-400 hidden';
-        switchCameraBtn.innerHTML = '🔄 Switch Camera';
-        document.querySelector('#cameraContent .flex').appendChild(switchCameraBtn);
-
-        // Handle camera switching
+        // Handle camera switching with proper orientation
+        const switchCameraBtn = document.getElementById('switchCameraBtn');
         switchCameraBtn.addEventListener('click', async () => {
-            currentFacingMode = currentFacingMode === 'environment' ? 'user' : 'environment';
-            const success = await initializeCamera(currentFacingMode);
+            const newFacingMode = currentFacingMode === 'environment' ? 'user' : 'environment';
+            const success = await initializeCamera(newFacingMode);
             if (!success) {
                 showCameraError('Failed to switch camera. Please try again.');
             }
@@ -323,7 +330,7 @@
 
         stopCameraBtn.addEventListener('click', stopCamera);
 
-        // Fix capture image functionality
+        // Update the capture image functionality to handle orientation
         captureImageBtn.addEventListener('click', () => {
             if (!cameraStream || cameraFeed.videoWidth === 0) {
                 showCameraError('Camera not active or video feed is empty. Please ensure camera is streaming.');
@@ -336,8 +343,16 @@
                 imageCanvas.width = cameraFeed.videoWidth;
                 imageCanvas.height = cameraFeed.videoHeight;
 
-                // Draw the current frame
-                context.drawImage(cameraFeed, 0, 0, imageCanvas.width, imageCanvas.height);
+                // Handle orientation for capture
+                if (currentFacingMode === 'user') {
+                    context.save();
+                    context.translate(imageCanvas.width, 0);
+                    context.scale(-1, 1);
+                    context.drawImage(cameraFeed, 0, 0, imageCanvas.width, imageCanvas.height);
+                    context.restore();
+                } else {
+                    context.drawImage(cameraFeed, 0, 0, imageCanvas.width, imageCanvas.height);
+                }
 
                 const imageDataUrl = imageCanvas.toDataURL('image/png');
                 imagePreview.src = imageDataUrl;
