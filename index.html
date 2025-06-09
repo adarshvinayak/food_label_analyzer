@@ -135,6 +135,18 @@
             justify-content: center;
             box-shadow: 0 2px 5px rgba(0,0,0,0.2);
         }
+        details > summary {
+            list-style: none;
+        }
+        details > summary::-webkit-details-marker {
+            display: none;
+        }
+        details[open] > summary > span {
+            transform: rotate(180deg);
+        }
+        details > summary > span {
+            transition: transform 0.2s ease;
+        }
     </style>
 </head>
 <body class="bg-slate-100 text-slate-800 min-h-screen flex flex-col items-center pt-8 pb-16 px-4">
@@ -324,7 +336,7 @@
                     imagePreview.classList.remove('hidden');
                     ingredientsTextarea.value = ''; 
                     analysisOutputDiv.innerHTML = '';
-                    showStatus('Image selected. Performing OCR via backend...', false);
+                    showStatus('Image selected. Performing OCR...', false);
                     // Pass base64 data, remove the data URL prefix
                     performOcrWithBackend(e.target.result.split(',')[1]); 
                 }
@@ -502,7 +514,7 @@
                     imagePreview.classList.remove('hidden');
                     ingredientsTextarea.value = '';
                     analysisOutputDiv.innerHTML = '';
-                    showStatus('Image captured. Performing OCR via backend...', false);
+                    showStatus('Image captured. Performing OCR...', false);
                     performOcrWithBackend(imageDataUrl.split(',')[1]);
                     stopCamera();
                 });
@@ -567,7 +579,7 @@
                 return;
             }
             
-            showStatus('Analyzing ingredients with AI (via backend), please wait...', false);
+            showStatus('Analyzing ingredients with AI, please wait...', false);
             setLoading(analyzeBtnText, analyzeLoader, true, '✨ Analyze Ingredients');
             analysisOutputDiv.innerHTML = '';
 
@@ -723,6 +735,54 @@
                 }
             }
         });
+
+        // Add the How It Works section to the HTML structure
+        const header = document.querySelector('header');
+        const howItWorksSection = document.createElement('div');
+        howItWorksSection.className = 'mb-8 w-full';
+        howItWorksSection.innerHTML = `
+            <details class="bg-white rounded-lg shadow-md">
+                <summary class="flex items-center justify-between p-4 cursor-pointer hover:bg-slate-50 rounded-lg">
+                    <h2 class="text-xl font-semibold text-teal-700">ℹ️ How It Works</h2>
+                    <span class="text-teal-600">▼</span>
+                </summary>
+                <div class="p-4 border-t border-slate-200">
+                    <div class="space-y-4">
+                        <div class="flex items-start gap-3">
+                            <div class="flex-shrink-0 w-8 h-8 bg-teal-100 rounded-full flex items-center justify-center text-teal-700 font-bold">1</div>
+                            <div>
+                                <h3 class="font-semibold text-slate-800">Capture or Upload</h3>
+                                <p class="text-slate-600">Take a photo of the ingredients label using your camera or upload an existing image.</p>
+                            </div>
+                        </div>
+                        <div class="flex items-start gap-3">
+                            <div class="flex-shrink-0 w-8 h-8 bg-teal-100 rounded-full flex items-center justify-center text-teal-700 font-bold">2</div>
+                            <div>
+                                <h3 class="font-semibold text-slate-800">Review & Edit</h3>
+                                <p class="text-slate-600">Review the extracted text and make any necessary edits to ensure accuracy.</p>
+                            </div>
+                        </div>
+                        <div class="flex items-start gap-3">
+                            <div class="flex-shrink-0 w-8 h-8 bg-teal-100 rounded-full flex items-center justify-center text-teal-700 font-bold">3</div>
+                            <div>
+                                <h3 class="font-semibold text-slate-800">AI Analysis</h3>
+                                <p class="text-slate-600">Our AI analyzes the ingredients and provides detailed information about their health impact.</p>
+                            </div>
+                        </div>
+                        <div class="flex items-start gap-3">
+                            <div class="flex-shrink-0 w-8 h-8 bg-teal-100 rounded-full flex items-center justify-center text-teal-700 font-bold">4</div>
+                            <div>
+                                <h3 class="font-semibold text-slate-800">Get Results</h3>
+                                <p class="text-slate-600">Receive a comprehensive analysis including health scores, potential side effects, and healthier alternatives.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </details>
+        `;
+
+        // Insert the How It Works section after the header
+        header.after(howItWorksSection);
 
     </script>
 </body>
