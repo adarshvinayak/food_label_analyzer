@@ -32,10 +32,6 @@
         }
         #cameraFeed {
             transform: scaleX(-1); /* Mirror mode for selfie view */
-            /* Add this to ensure the video scales correctly within its container */
-            max-width: 100%;
-            height: auto;
-            display: block; /* Remove any default inline margins */
         }
         .loader {
             border: 4px solid #f3f3f3;
@@ -49,91 +45,21 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
-        @media (max-width: 640px) {
-            .camera-container {
-                width: 100%;
-                max-width: 100%;
-                height: calc(100vh - 200px);
-                min-height: 400px;
-                margin: 0 auto;
-                position: relative;
-                background: #000;
-                overflow: hidden;
-            }
-            .camera-feed {
-                width: 100%;
-                height: 100%;
-                object-fit: cover;
-                transform-origin: center;
-            }
-            .camera-feed.portrait {
-                transform: rotate(90deg) scale(1.5);
-            }
-            .camera-feed.landscape {
-                transform: none;
-            }
+        details > summary {
+            list-style: none;
         }
-        .expanded-image-container {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.9);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            z-index: 1000;
-            padding: 20px;
+        details > summary::-webkit-details-marker {
+            display: none;
         }
-        .expanded-image {
-            max-width: 100%;
-            max-height: 100%;
-            object-fit: contain;
+        details[open] > summary > span {
+            transform: rotate(180deg);
         }
-        .close-expanded-image {
-            position: absolute;
-            top: 20px;
-            right: 20px;
-            background: white;
-            border: none;
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            font-size: 24px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        details > summary:focus {
+            outline: none;
         }
-        .captured-image-container {
-            position: relative;
-            width: 100%;
-            max-width: 400px;
-            margin: 0 auto;
-        }
-        .captured-image {
-            width: 100%;
-            height: auto;
-            border-radius: 8px;
-            cursor: pointer;
-        }
-        .expand-image-btn {
-            position: absolute;
-            bottom: 10px;
-            right: 10px;
-            background: rgba(255, 255, 255, 0.9);
-            border: none;
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            font-size: 20px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        details > summary:focus-visible {
+            outline: 2px solid #0D9488;
+            outline-offset: 2px;
         }
     </style>
 </head>
@@ -145,6 +71,49 @@
             <p class="text-slate-600 mt-2 text-lg">Analyze food ingredients for a healthier choice.</p>
         </header>
 
+        <!-- Add the How It Works section to the HTML structure -->
+        <div class="mb-8 w-full">
+            <details class="bg-white rounded-lg shadow-md overflow-hidden">
+                <summary class="flex items-center justify-between p-4 cursor-pointer hover:bg-slate-50">
+                    <h2 class="text-xl font-semibold text-teal-700">ℹ️ How It Works</h2>
+                    <span class="transform transition-transform duration-200">▼</span>
+                </summary>
+                <div class="p-4 border-t border-slate-200">
+                    <div class="space-y-4">
+                        <div class="flex items-start gap-3">
+                            <div class="flex-shrink-0 w-8 h-8 bg-teal-100 rounded-full flex items-center justify-center text-teal-700 font-bold">1</div>
+                            <div>
+                                <h3 class="font-semibold text-slate-800">Upload or Capture</h3>
+                                <p class="text-slate-600">Upload an image of food ingredients or use your camera to capture the label.</p>
+                            </div>
+                        </div>
+                        <div class="flex items-start gap-3">
+                            <div class="flex-shrink-0 w-8 h-8 bg-teal-100 rounded-full flex items-center justify-center text-teal-700 font-bold">2</div>
+                            <div>
+                                <h3 class="font-semibold text-slate-800">Review & Edit</h3>
+                                <p class="text-slate-600">Review the extracted text and make any necessary edits to ensure accuracy.</p>
+                            </div>
+                        </div>
+                        <div class="flex items-start gap-3">
+                            <div class="flex-shrink-0 w-8 h-8 bg-teal-100 rounded-full flex items-center justify-center text-teal-700 font-bold">3</div>
+                            <div>
+                                <h3 class="font-semibold text-slate-800">AI Analysis</h3>
+                                <p class="text-slate-600">Our AI analyzes the ingredients and provides detailed insights about their health impact.</p>
+                            </div>
+                        </div>
+                        <div class="flex items-start gap-3">
+                            <div class="flex-shrink-0 w-8 h-8 bg-teal-100 rounded-full flex items-center justify-center text-teal-700 font-bold">4</div>
+                            <div>
+                                <h3 class="font-semibold text-slate-800">Get Results</h3>
+                                <p class="text-slate-600">Receive a comprehensive analysis including health score, ingredient breakdown, and alternatives.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </details>
+        </div>
+
+        <!-- Input Section -->
         <section id="inputSection" class="mb-8">
             <h2 class="text-2xl font-semibold text-teal-600 mb-4 border-b-2 border-teal-200 pb-2">Step 1: Provide Ingredients</h2>
             
@@ -170,44 +139,20 @@
                 </div>
 
                 <div id="cameraContent" class="py-6 hidden">
-                    <div class="flex flex-col gap-4">
-                        <div class="flex flex-col sm:flex-row gap-4 mb-4">
-                            <button id="startCameraBtn" class="flex-1 bg-sky-500 hover:bg-sky-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md transition duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-sky-400">Start Camera</button>
-                            <button id="stopCameraBtn" class="flex-1 bg-orange-500 hover:bg-orange-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md transition duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-orange-400 hidden">Stop Camera</button>
-                            <button id="switchCameraBtn" class="flex-1 bg-purple-500 hover:bg-purple-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md transition duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-purple-400 hidden">🔄 Switch Camera</button>
-                        </div>
-                        <div id="cameraContainer" class="relative bg-slate-200 rounded-lg overflow-hidden shadow-inner mx-auto" style="width: 100%; max-width: 400px;">
-                            <video id="cameraFeed" playsinline class="w-full h-full object-cover"></video>
-                            <div id="cameraStatusMessage" class="text-center text-sm text-red-500 mt-2 hidden"></div>
-                        </div>
-                        <button id="captureImageBtn" class="w-full max-w-[400px] mx-auto bg-green-500 hover:bg-green-600 text-white font-semibold py-3 px-6 rounded-lg shadow-md transition duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-green-400 hidden">
-                            📸 Capture Image
-                        </button>
-                        <canvas id="imageCanvas" class="hidden"></canvas>
-                        
-                        <!-- Updated Image Preview Section -->
-                        <div id="cameraPreviewSection" class="mt-4 hidden">
-                            <h3 class="text-lg font-semibold text-teal-700 mb-2">Captured Image</h3>
-                            <div class="relative bg-slate-200 rounded-lg overflow-hidden shadow-inner mx-auto" style="width: 100%; max-width: 400px;">
-                                <div id="noImageMessage" class="flex justify-center items-center h-32 text-slate-500">
-                                    No image captured yet
-                                </div>
-                                <img id="cameraImagePreview" src="#" alt="Captured image" class="w-full h-full object-contain hidden">
-                            </div>
-                            <div class="flex gap-2 mt-2 justify-center">
-                                <button id="retakePhotoBtn" class="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md transition duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-400 hidden">
-                                    ↩️ Retake Photo
-                                </button>
-                                <button id="usePhotoBtn" class="bg-green-500 hover:bg-green-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md transition duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-green-400 hidden">
-                                    ✅ Use Photo
-                                </button>
-                            </div>
-                        </div>
+                    <div class="flex flex-col sm:flex-row gap-4 mb-4">
+                        <button id="startCameraBtn" class="flex-1 bg-sky-500 hover:bg-sky-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md transition duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-sky-400">Start Camera</button>
+                        <button id="stopCameraBtn" class="flex-1 bg-orange-500 hover:bg-orange-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md transition duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-orange-400 hidden">Stop Camera</button>
+                        <button id="captureImageBtn" class="flex-1 bg-green-500 hover:bg-green-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md transition duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-green-400 hidden">Capture Image</button>
                     </div>
+                    <div class="bg-slate-200 rounded-lg overflow-hidden shadow-inner aspect-video max-h-[400px] mx-auto">
+                        <video id="cameraFeed" playsinline class="w-full h-full object-cover"></video>
+                    </div>
+                    <canvas id="imageCanvas" class="hidden"></canvas> <!-- For capturing frame -->
                 </div>
             </div>
         </section>
 
+        <!-- Review Section -->
         <section id="reviewSection" class="mb-8">
             <h2 class="text-2xl font-semibold text-teal-600 mb-4 border-b-2 border-teal-200 pb-2">Step 2: Review & Analyze</h2>
             <label for="ingredientsText" class="block mb-2 text-sm font-medium text-slate-700">Extracted or manually entered ingredients (edit if needed):</label>
@@ -218,11 +163,13 @@
             </button>
         </section>
 
+        <!-- Status and Results Section -->
         <section id="resultsSection">
             <h2 class="text-2xl font-semibold text-teal-600 mb-4 border-b-2 border-teal-200 pb-2">Step 3: Analysis Results</h2>
             <div id="statusMessage" class="mb-6 p-4 rounded-lg text-sm min-h-[50px]"></div>
             <div id="analysisOutput" class="space-y-6">
-                </div>
+                <!-- Analysis results will be injected here -->
+            </div>
         </section>
 
          <footer class="mt-12 text-center text-xs text-slate-500">
@@ -234,7 +181,7 @@
     <script>
         // --- NO API KEYS ARE STORED ON THE CLIENT-SIDE ---
         // API calls are now directed to backend endpoints.
-        // You need to implement these backend endpoints (/api/ocr and /api/analyze)
+        // You need to implement these backend endpoints (/api/perform-ocr and /api/analyze-ingredients)
         // which will securely handle your API keys and make the actual calls to
         // Google Vision API and Groq API respectively.
 
@@ -252,7 +199,6 @@
         const captureImageBtn = document.getElementById('captureImageBtn');
         const cameraFeed = document.getElementById('cameraFeed');
         const imageCanvas = document.getElementById('imageCanvas');
-        const cameraStatusMessageDiv = document.getElementById('cameraStatusMessage'); // NEW: For camera-specific errors
         
         const ingredientsTextarea = document.getElementById('ingredientsText');
         const analyzeBtn = document.getElementById('analyzeBtn');
@@ -263,18 +209,14 @@
         const analysisOutputDiv = document.getElementById('analysisOutput');
 
         let cameraStream = null;
-        let currentFacingMode = 'environment';
-
-        // Update the camera feed style to handle orientation
-        cameraFeed.style.transform = currentFacingMode === 'user' ? 'scaleX(-1)' : 'none';
 
         // --- TAB SWITCHING LOGIC ---
         tabUpload.addEventListener('click', () => {
-            stopCamera(); // Ensure camera is stopped when switching to upload tab
             uploadContent.classList.remove('hidden');
             cameraContent.classList.add('hidden');
             tabUpload.classList.add('active');
             tabCamera.classList.remove('active');
+            stopCamera();
         });
 
         tabCamera.addEventListener('click', () => {
@@ -282,24 +224,12 @@
             uploadContent.classList.add('hidden');
             tabCamera.classList.add('active');
             tabUpload.classList.remove('active');
-            // Do not auto-start camera here, let user click 'Start Camera'
-            // showStatus('Click "Start Camera" to begin scanning ingredients.', false); // Give initial instruction
         });
 
         // --- STATUS & LOADING ---
         function showStatus(message, isError = false) {
             statusMessageDiv.textContent = message;
             statusMessageDiv.className = `mb-6 p-4 rounded-lg text-sm ${isError ? 'bg-red-100 text-red-700' : 'bg-sky-100 text-sky-700'}`;
-        }
-
-        function showCameraError(message) { // NEW FUNCTION: For camera-specific errors
-            cameraStatusMessageDiv.textContent = message;
-            cameraStatusMessageDiv.classList.remove('hidden');
-        }
-
-        function clearCameraStatus() { // NEW FUNCTION: Clear camera errors
-            cameraStatusMessageDiv.textContent = '';
-            cameraStatusMessageDiv.classList.add('hidden');
         }
 
         function setLoading(buttonTextElement, loaderElement, isLoading, defaultText) {
@@ -325,8 +255,7 @@
                     ingredientsTextarea.value = ''; 
                     analysisOutputDiv.innerHTML = '';
                     showStatus('Image selected. Performing OCR via backend...', false);
-                    // Pass base64 data, remove the data URL prefix
-                    performOcrWithBackend(e.target.result.split(',')[1]); 
+                    performOcrWithBackend(e.target.result.split(',')[1]); // Pass base64 data
                 }
                 reader.readAsDataURL(file);
             } else {
@@ -336,201 +265,84 @@
         });
 
         // --- CAMERA HANDLING ---
-        // Improved camera initialization with camera switching support
-        async function initializeCamera(facingMode = 'environment') {
-            if (cameraStream) {
-                cleanupCamera();
-            }
-
-            try {
-                const constraints = {
-                    video: {
-                        width: { ideal: 1280 },
-                        height: { ideal: 720 },
-                        facingMode: facingMode
-                    }
-                };
-
-                cameraStream = await navigator.mediaDevices.getUserMedia(constraints);
-                cameraFeed.srcObject = cameraStream;
-                
-                return new Promise((resolve) => {
-                    cameraFeed.onloadedmetadata = () => {
-                        cameraFeed.play()
-                            .then(() => resolve(true))
-                            .catch(() => resolve(false));
-                    };
-                });
-            } catch (error) {
-                console.error('Camera initialization error:', error);
-                return false;
-            }
-        }
-
-        function cleanupCamera() {
-            if (cameraStream) {
-                cameraStream.getTracks().forEach(track => {
-                    track.stop();
-                });
-                cameraStream = null;
-                cameraFeed.srcObject = null;
-            }
-        }
-
-        // Handle camera switching with proper orientation
-        const switchCameraBtn = document.getElementById('switchCameraBtn');
-        switchCameraBtn.addEventListener('click', async () => {
-            const newFacingMode = currentFacingMode === 'environment' ? 'user' : 'environment';
-            const success = await initializeCamera(newFacingMode);
-            if (!success) {
-                showCameraError('Failed to switch camera. Please try again.');
-            }
-        });
-
-        // Improved start camera handler
         startCameraBtn.addEventListener('click', async () => {
-            clearCameraStatus();
-            showStatus('Initializing camera...', false);
-            startCameraBtn.disabled = true;
-
-            try {
-                const success = await initializeCamera(currentFacingMode);
-                
-                if (success) {
+            if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+                try {
+                    cameraStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+                    cameraFeed.srcObject = cameraStream;
                     cameraFeed.classList.remove('hidden');
                     startCameraBtn.classList.add('hidden');
                     stopCameraBtn.classList.remove('hidden');
                     captureImageBtn.classList.remove('hidden');
-                    switchCameraBtn.classList.remove('hidden');
-                    captureImageBtn.disabled = false;
                     showStatus('Camera started. Position the ingredients label.', false);
-                } else {
-                    throw new Error('Failed to initialize camera');
+                } catch (error) {
+                    console.error("Error accessing camera:", error);
+                    showStatus(`Error accessing camera: ${error.name}. Please ensure permissions are granted.`, true);
+                     if (error.name === "NotAllowedError") {
+                         showStatus("Camera access was denied. Please allow camera access in your browser settings and refresh the page.", true);
+                    } else if (error.name === "NotFoundError" || error.name === "DevicesNotFoundError") {
+                        showStatus("No camera found. Please ensure a camera is connected and enabled.", true);
+                    } else {
+                        showStatus("Could not access the camera. Please check your browser settings and ensure a camera is available.", true);
+                    }
                 }
-            } catch (error) {
-                console.error('Camera error:', error);
-                showCameraError('Failed to start camera. Please check permissions and try again.');
-                showStatus('Camera failed to start.', true);
-                startCameraBtn.disabled = false;
-                cleanupCamera();
+            } else {
+                showStatus('Camera API not supported by your browser.', true);
             }
         });
-
-        // Improved stop camera handler
-        function stopCamera() {
-            cleanupCamera();
-            startCameraBtn.classList.remove('hidden');
-            startCameraBtn.disabled = false;
-            stopCameraBtn.classList.add('hidden');
-            captureImageBtn.classList.add('hidden');
-            switchCameraBtn.classList.add('hidden');
-            captureImageBtn.disabled = true;
-            showStatus('Camera stopped.', false);
-            clearCameraStatus();
-            
-            // Reset preview section
-            const previewSection = document.getElementById('cameraPreviewSection');
-            const cameraImagePreview = document.getElementById('cameraImagePreview');
-            const noImageMessage = document.getElementById('noImageMessage');
-            const retakePhotoBtn = document.getElementById('retakePhotoBtn');
-            const usePhotoBtn = document.getElementById('usePhotoBtn');
-            
-            previewSection.classList.add('hidden');
-            cameraImagePreview.classList.add('hidden');
-            noImageMessage.classList.remove('hidden'); // Show the "no image" message again
-            retakePhotoBtn.classList.add('hidden');
-            usePhotoBtn.classList.add('hidden');
-            cameraFeed.classList.remove('hidden');
-        }
 
         stopCameraBtn.addEventListener('click', stopCamera);
 
-        // Update the capture image functionality to handle orientation
+        function stopCamera() {
+            if (cameraStream) {
+                cameraStream.getTracks().forEach(track => track.stop());
+                cameraFeed.srcObject = null;
+                cameraStream = null;
+                startCameraBtn.classList.remove('hidden');
+                stopCameraBtn.classList.add('hidden');
+                captureImageBtn.classList.add('hidden');
+                showStatus('Camera stopped.', false);
+            }
+        }
+        
         captureImageBtn.addEventListener('click', () => {
-            if (!cameraStream || cameraFeed.videoWidth === 0) {
-                showCameraError('Camera not active or video feed is empty. Please ensure camera is streaming.');
-                showStatus('Cannot capture: Camera not ready.', true);
+            if (!cameraStream) {
+                showStatus('Camera not active. Please start the camera first.', true);
                 return;
             }
-            
-            try {
-                // Pause the video stream to freeze the frame
-                cameraFeed.pause();
-                
-                const context = imageCanvas.getContext('2d');
-                imageCanvas.width = cameraFeed.videoWidth;
-                imageCanvas.height = cameraFeed.videoHeight;
-
-                // Draw the current frame
+            const context = imageCanvas.getContext('2d');
+            imageCanvas.width = cameraFeed.videoWidth;
+            imageCanvas.height = cameraFeed.videoHeight;
+            context.save();
+            if (cameraFeed.style.transform === 'scaleX(-1)') {
+                context.scale(-1, 1);
+                context.drawImage(cameraFeed, -imageCanvas.width, 0, imageCanvas.width, imageCanvas.height);
+            } else {
                 context.drawImage(cameraFeed, 0, 0, imageCanvas.width, imageCanvas.height);
-
-                const imageDataUrl = imageCanvas.toDataURL('image/png');
-                
-                // Show preview section
-                const previewSection = document.getElementById('cameraPreviewSection');
-                const cameraImagePreview = document.getElementById('cameraImagePreview');
-                const noImageMessage = document.getElementById('noImageMessage');
-                const retakePhotoBtn = document.getElementById('retakePhotoBtn');
-                const usePhotoBtn = document.getElementById('usePhotoBtn');
-                
-                previewSection.classList.remove('hidden');
-                noImageMessage.classList.add('hidden'); // Hide the "no image" message
-                cameraImagePreview.src = imageDataUrl;
-                cameraImagePreview.classList.remove('hidden');
-                retakePhotoBtn.classList.remove('hidden');
-                usePhotoBtn.classList.remove('hidden');
-                
-                // Hide camera feed
-                cameraFeed.classList.add('hidden');
-                captureImageBtn.classList.add('hidden');
-                
-                // Add retake photo functionality
-                retakePhotoBtn.addEventListener('click', () => {
-                    previewSection.classList.add('hidden');
-                    cameraImagePreview.classList.add('hidden');
-                    noImageMessage.classList.remove('hidden'); // Show the "no image" message again
-                    retakePhotoBtn.classList.add('hidden');
-                    usePhotoBtn.classList.add('hidden');
-                    cameraFeed.classList.remove('hidden');
-                    captureImageBtn.classList.remove('hidden');
-                    cameraFeed.play();
-                });
-                
-                // Add use photo functionality
-                usePhotoBtn.addEventListener('click', () => {
-                    imagePreview.src = imageDataUrl;
-                    imagePreview.classList.remove('hidden');
-                    ingredientsTextarea.value = '';
-                    analysisOutputDiv.innerHTML = '';
-                    showStatus('Image captured. Performing OCR via backend...', false);
-                    performOcrWithBackend(imageDataUrl.split(',')[1]);
-                    stopCamera();
-                });
-                
-            } catch (error) {
-                console.error('Error capturing image:', error);
-                showCameraError('Failed to capture image. Please try again.');
-                // Resume video stream if capture fails
-                cameraFeed.play();
             }
-        });
+            context.restore();
 
-        // Add proper mobile viewport handling
-        const meta = document.createElement('meta');
-        meta.name = 'viewport';
-        meta.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
-        document.head.appendChild(meta);
+            const imageDataUrl = imageCanvas.toDataURL('image/png');
+            imagePreview.src = imageDataUrl; 
+            imagePreview.classList.remove('hidden');
+            ingredientsTextarea.value = ''; 
+            analysisOutputDiv.innerHTML = ''; 
+            showStatus('Image captured. Performing OCR via backend...', false);
+            performOcrWithBackend(imageDataUrl.split(',')[1]); // Pass base64 data
+            stopCamera(); 
+        });
 
         // --- OCR FUNCTION (Calls Backend) ---
         async function performOcrWithBackend(base64ImageData) {
             setLoading(analyzeBtnText, analyzeLoader, true, '✨ Analyze Ingredients');
             
+            // This is where you would call your backend endpoint for OCR
+            // Example: const backendOcrUrl = '/api/perform-ocr';
             try {
-                // FIX: Corrected endpoint from '/api/perform-ocr' to '/api/ocr' to match Vercel function name
-                const response = await fetch('/api/ocr', { 
+                const response = await fetch('/api/perform-ocr', { // Replace with your actual backend endpoint
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ image_data: base64ImageData }) 
+                    body: JSON.stringify({ image_data: base64ImageData })
                 });
                 
                 if (!response.ok) {
@@ -538,7 +350,7 @@
                     throw new Error(errorResult.message || `OCR backend request failed with status ${response.status}`);
                 }
                 
-                const result = await response.json(); 
+                const result = await response.json(); // Assuming backend returns { "text": "detected_text" } or { "error": "message" }
 
                 if (result.error) {
                     showStatus(`OCR Error from backend: ${result.error}`, true);
@@ -572,11 +384,49 @@
             analysisOutputDiv.innerHTML = '';
 
             try {
-                // FIX: Corrected endpoint from '/api/analyze-ingredients' to '/api/analyze' to match Vercel function name
                 const response = await fetch('/api/analyze', { 
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ ingredients_text: ingredients, model: "llama-3.3-70b-versatile" }) 
+                    body: JSON.stringify({ 
+                        ingredients_text: ingredients, 
+                        model: "llama-3.3-70b-versatile",
+                        system_prompt: `You are an expert food ingredient analyzer. Analyze the provided ingredients list and provide a comprehensive health analysis. 
+                        If quantities are provided (e.g., "2%", "5g", "10mg", etc.), include them in your analysis and consider their impact on health.
+                        If no quantities are provided, note this limitation in the "Other Observations" section.
+
+                        Provide the analysis in the following JSON format:
+                        {
+                            "overall_health_score": number (0-100),
+                            "potential_side_effects": string[],
+                            "ingredients_analysis": {
+                                "toxic_banned": [{"name": string, "explanation": string, "reference_url": string}],
+                                "bad": [{"name": string, "explanation": string, "reference_url": string}],
+                                "average": [{"name": string, "explanation": string, "reference_url": string}],
+                                "good": [{"name": string, "explanation": string, "reference_url": string}],
+                                "healthy": [{"name": string, "explanation": string, "reference_url": string}]
+                            },
+                            "other_observations": string[],
+                            "conclusion": {
+                                "summary": string,
+                                "alternatives": string[]
+                            }
+                        }
+
+                        For each ingredient:
+                        1. If quantity is provided, analyze its health impact based on the amount
+                        2. If no quantity is provided, analyze based on typical usage but note this limitation
+                        3. Include quantity information in the explanation when available
+                        4. Consider daily recommended values when analyzing quantities
+                        5. Note any potential interactions between ingredients based on their quantities
+
+                        In the "Other Observations" section:
+                        - If quantities are missing, note that a more accurate analysis could be provided with quantity information
+                        - Mention any quantity-related concerns or benefits
+                        - Note if any ingredients exceed recommended daily values
+                        - Highlight any quantity-dependent health implications
+
+                        Be thorough but concise in your analysis.`
+                    }) 
                 });
 
                 if (!response.ok) {
@@ -603,7 +453,7 @@
             }
         });
 
-        // --- DISPLAY ANALYSIS RESULTS ---
+        // --- DISPLAY ANALYSIS RESULTS (No changes needed here if backend returns the same JSON structure) ---
         function displayAnalysisResults(data, originalIngredients) {
             analysisOutputDiv.innerHTML = ''; 
 
@@ -693,36 +543,6 @@
 
         // --- INITIALIZATION ---
         showStatus('Ready to analyze. Upload an image, use your camera, or type ingredients.', false);
-
-        // Handle visibility change (minimizing window)
-        document.addEventListener('visibilitychange', () => {
-            if (document.hidden) {
-                stopCamera(); // Stop camera when window is minimized
-            }
-        });
-
-        // Handle page unload
-        window.addEventListener('beforeunload', () => {
-            cleanupCamera();
-        });
-
-        // Handle tab close
-        window.addEventListener('unload', () => {
-            cleanupCamera();
-        });
-
-        // Add orientation change handler
-        window.addEventListener('resize', () => {
-            if (cameraStream) {
-                if (window.innerWidth <= 640) {
-                    cameraFeed.classList.remove('landscape');
-                    cameraFeed.classList.add('portrait');
-                } else {
-                    cameraFeed.classList.remove('portrait');
-                    cameraFeed.classList.add('landscape');
-                }
-            }
-        });
 
     </script>
 </body>
