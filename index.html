@@ -705,6 +705,163 @@
             cleanupCamera();
         });
 
+        // Create modal for expanded view with proper structure
+        const modal = document.createElement('div');
+        modal.id = 'cameraModal';
+        modal.className = 'fixed inset-0 bg-black bg-opacity-90 z-50 hidden';
+        modal.innerHTML = `
+            <div class="fixed inset-0 flex flex-col">
+                <div class="relative flex-1">
+                    <video id="modalCameraFeed" playsinline class="w-full h-full object-contain"></video>
+                    <img id="modalCapturedImage" class="w-full h-full object-contain hidden" alt="Captured Image">
+                    <button id="closeModalBtn" class="absolute top-4 right-4 bg-black bg-opacity-50 text-white p-3 rounded-full hover:bg-opacity-75 transition-opacity z-50">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+                <div class="fixed bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black to-transparent">
+                    <button id="modalCaptureBtn" class="w-full bg-green-500 hover:bg-green-600 text-white font-semibold py-4 px-6 text-lg rounded-lg shadow-lg">
+                        📸 Capture Image
+                    </button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+
+        // Update the CSS for proper modal styling
+        const style = document.createElement('style');
+        style.textContent = `
+            #cameraModal {
+                transition: opacity 0.3s ease-in-out;
+            }
+            
+            #cameraModal.hidden {
+                opacity: 0;
+                pointer-events: none;
+            }
+            
+            #cameraModal:not(.hidden) {
+                opacity: 1;
+            }
+            
+            #modalCameraFeed,
+            #modalCapturedImage {
+                max-height: calc(100vh - 120px); /* Account for capture button height */
+                width: 100%;
+                object-fit: contain;
+            }
+            
+            #closeModalBtn {
+                z-index: 1001;
+                backdrop-filter: blur(4px);
+            }
+            
+            #modalCaptureBtn {
+                z-index: 1001;
+                backdrop-filter: blur(4px);
+            }
+
+            /* Add styles for expand button */
+            #toggleExpandBtn {
+                position: absolute;
+                top: 8px;
+                right: 8px;
+                background-color: rgba(0, 0, 0, 0.5);
+                color: white;
+                padding: 8px;
+                border-radius: 9999px;
+                cursor: pointer;
+                z-index: 1000;
+                display: none;
+                backdrop-filter: blur(4px);
+            }
+
+            #toggleExpandBtn:hover {
+                background-color: rgba(0, 0, 0, 0.75);
+            }
+
+            #toggleExpandBtn:not(.hidden) {
+                display: block !important;
+            }
+
+            /* Ensure modal content is properly positioned */
+            #cameraModal > div {
+                height: 100vh;
+                width: 100vw;
+                position: fixed;
+                top: 0;
+                left: 0;
+            }
+
+            /* Add gradient overlay for better button visibility */
+            #cameraModal::after {
+                content: '';
+                position: fixed;
+                bottom: 0;
+                left: 0;
+                right: 0;
+                height: 120px;
+                background: linear-gradient(to top, rgba(0,0,0,0.8), transparent);
+                pointer-events: none;
+            }
+        `;
+        document.head.appendChild(style);
+
+        // Update modal capture button handler
+        document.getElementById('modalCaptureBtn').addEventListener('click', () => {
+            const modalCameraFeed = document.getElementById('modalCameraFeed');
+            const context = imageCanvas.getContext('2d');
+            imageCanvas.width = modalCameraFeed.videoWidth;
+            imageCanvas.height = modalCameraFeed.videoHeight;
+
+            // Handle orientation for capture
+            if (currentFacingMode === 'user') {
+                context.save();
+                context.translate(imageCanvas.width, 0);
+                context.scale(-1, 1);
+                context.drawImage(modalCameraFeed, 0, 0, imageCanvas.width, imageCanvas.height);
+                context.restore();
+            } else {
+                context.drawImage(modalCameraFeed, 0, 0, imageCanvas.width, imageCanvas.height);
+            }
+
+            const imageDataUrl = imageCanvas.toDataURL('image/png');
+            
+            // Show captured image in both modal and container
+            const capturedImage = document.getElementById('capturedImage');
+            const modalCapturedImage = document.getElementById('modalCapturedImage');
+            
+            capturedImage.src = imageDataUrl;
+            modalCapturedImage.src = imageDataUrl;
+            
+            capturedImage.classList.remove('hidden');
+            modalCapturedImage.classList.remove('hidden');
+            modalCameraFeed.classList.add('hidden');
+            
+            // Update preview and start OCR
+            imagePreview.src = imageDataUrl;
+            imagePreview.classList.remove('hidden');
+            ingredientsTextarea.value = '';
+            analysisOutputDiv.innerHTML = '';
+            showStatus('Image captured. Performing OCR via backend...', false);
+            performOcrWithBackend(imageDataUrl.split(',')[1]);
+            
+            // Close modal and stop camera
+            modal.classList.add('hidden');
+            stopCamera();
+        });
+
+        // Handle close modal with proper cleanup
+        document.getElementById('closeModalBtn').addEventListener('click', () => {
+            modal.classList.add('hidden');
+            // Reset modal state
+            const modalCameraFeed = document.getElementById('modalCameraFeed');
+            const modalCapturedImage = document.getElementById('modalCapturedImage');
+            modalCameraFeed.classList.remove('hidden');
+            modalCapturedImage.classList.add('hidden');
+        });
+
     </script>
 </body>
 </html>
