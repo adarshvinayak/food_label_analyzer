@@ -176,7 +176,7 @@
                             <button id="stopCameraBtn" class="flex-1 bg-orange-500 hover:bg-orange-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md transition duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-orange-400 hidden">Stop Camera</button>
                             <button id="switchCameraBtn" class="flex-1 bg-purple-500 hover:bg-purple-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md transition duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-purple-400 hidden">🔄 Switch Camera</button>
                         </div>
-                        <div class="relative bg-slate-200 rounded-lg overflow-hidden shadow-inner mx-auto" style="width: 100%; max-width: 400px; aspect-ratio: 9/16;">
+                        <div id="cameraContainer" class="relative bg-slate-200 rounded-lg overflow-hidden shadow-inner mx-auto" style="width: 100%; max-width: 400px;">
                             <video id="cameraFeed" playsinline class="w-full h-full object-cover"></video>
                             <div id="cameraStatusMessage" class="text-center text-sm text-red-500 mt-2 hidden"></div>
                         </div>
@@ -335,13 +335,6 @@
                 cameraStream = await navigator.mediaDevices.getUserMedia(constraints);
                 cameraFeed.srcObject = cameraStream;
                 
-                // Handle orientation
-                if (window.innerWidth <= 640) { // Mobile view
-                    cameraFeed.classList.add('portrait');
-                } else {
-                    cameraFeed.classList.add('landscape');
-                }
-                
                 return new Promise((resolve) => {
                     cameraFeed.onloadedmetadata = () => {
                         cameraFeed.play()
@@ -415,6 +408,13 @@
             captureImageBtn.disabled = true;
             showStatus('Camera stopped.', false);
             clearCameraStatus();
+            
+            // Remove captured image if it exists
+            const capturedImageContainer = document.querySelector('.captured-image-container');
+            if (capturedImageContainer) {
+                capturedImageContainer.remove();
+            }
+            cameraFeed.classList.remove('hidden');
         }
 
         stopCameraBtn.addEventListener('click', stopCamera);
@@ -428,35 +428,15 @@
             }
             
             try {
-                const context = imageCanvas.getContext('2d');
+                // Pause the video stream to freeze the frame
+                cameraFeed.pause();
                 
-                // Set canvas dimensions based on orientation
-                if (window.innerWidth <= 640) {
-                    imageCanvas.width = cameraFeed.videoHeight;
-                    imageCanvas.height = cameraFeed.videoWidth;
-                } else {
-                    imageCanvas.width = cameraFeed.videoWidth;
-                    imageCanvas.height = cameraFeed.videoHeight;
-                }
+                const context = imageCanvas.getContext('2d');
+                imageCanvas.width = cameraFeed.videoWidth;
+                imageCanvas.height = cameraFeed.videoHeight;
 
-                // Handle orientation for capture
-                if (window.innerWidth <= 640) {
-                    context.save();
-                    context.translate(imageCanvas.width/2, imageCanvas.height/2);
-                    context.rotate(-Math.PI/2);
-                    context.drawImage(cameraFeed, -cameraFeed.videoHeight/2, -cameraFeed.videoWidth/2, cameraFeed.videoHeight, cameraFeed.videoWidth);
-                    context.restore();
-                } else {
-                    if (currentFacingMode === 'user') {
-                        context.save();
-                        context.translate(imageCanvas.width, 0);
-                        context.scale(-1, 1);
-                        context.drawImage(cameraFeed, 0, 0, imageCanvas.width, imageCanvas.height);
-                        context.restore();
-                    } else {
-                        context.drawImage(cameraFeed, 0, 0, imageCanvas.width, imageCanvas.height);
-                    }
-                }
+                // Draw the current frame
+                context.drawImage(cameraFeed, 0, 0, imageCanvas.width, imageCanvas.height);
 
                 const imageDataUrl = imageCanvas.toDataURL('image/png');
                 
@@ -502,6 +482,8 @@
             } catch (error) {
                 console.error('Error capturing image:', error);
                 showCameraError('Failed to capture image. Please try again.');
+                // Resume video stream if capture fails
+                cameraFeed.play();
             }
         });
 
