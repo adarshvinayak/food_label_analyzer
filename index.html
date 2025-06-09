@@ -222,7 +222,49 @@
         });
 
         // --- CAMERA HANDLING ---
-        // Utility functions for camera handling
+        // Simplified camera initialization
+        async function initializeCamera() {
+            if (cameraStream) {
+                cleanupCamera();
+            }
+
+            try {
+                // Try to get the rear camera first
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                const videoDevices = devices.filter(device => device.kind === 'videoinput');
+                
+                // Default constraints
+                let constraints = {
+                    video: {
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
+                    }
+                };
+
+                // If we have multiple cameras, try to use the rear one
+                if (videoDevices.length > 1) {
+                    constraints.video.facingMode = 'environment';
+                }
+
+                cameraStream = await navigator.mediaDevices.getUserMedia(constraints);
+                
+                // Set up the video stream
+                cameraFeed.srcObject = cameraStream;
+                
+                // Wait for the video to be ready
+                return new Promise((resolve) => {
+                    cameraFeed.onloadedmetadata = () => {
+                        cameraFeed.play()
+                            .then(() => resolve(true))
+                            .catch(() => resolve(false));
+                    };
+                });
+            } catch (error) {
+                console.error('Camera initialization error:', error);
+                return false;
+            }
+        }
+
         function cleanupCamera() {
             if (cameraStream) {
                 cameraStream.getTracks().forEach(track => {
@@ -232,68 +274,6 @@
                 cameraFeed.srcObject = null;
             }
         }
-
-        async function initializeCamera() {
-            cleanupCamera(); // Clean up any existing stream
-            
-            const constraints = {
-                video: {
-                    width: { ideal: 1280 },
-                    height: { ideal: 720 },
-                    facingMode: 'environment'
-                }
-            };
-
-            try {
-                cameraStream = await navigator.mediaDevices.getUserMedia(constraints);
-                cameraFeed.srcObject = cameraStream;
-                
-                // Wait for video to be ready
-                await new Promise((resolve) => {
-                    cameraFeed.onloadedmetadata = () => {
-                        resolve();
-                    };
-                });
-
-                return true;
-            } catch (error) {
-                console.error('Camera initialization error:', error);
-                return false;
-            }
-        }
-
-        // Debounce utility function
-        function debounce(func, wait) {
-            let timeout;
-            return function executedFunction(...args) {
-                const later = () => {
-                    clearTimeout(timeout);
-                    func(...args);
-                };
-                clearTimeout(timeout);
-                timeout = setTimeout(later, wait);
-            };
-        }
-
-        // Add proper error boundaries
-        window.addEventListener('unhandledrejection', (event) => {
-            console.error('Unhandled promise rejection:', event.reason);
-            if (event.reason.name === 'NotAllowedError') {
-                showCameraError('Camera access was denied. Please allow camera access in your browser settings.');
-            }
-        });
-
-        // Add proper cleanup on page unload
-        window.addEventListener('beforeunload', () => {
-            cleanupCamera();
-        });
-
-        // Add error handling for video element
-        cameraFeed.addEventListener('error', (error) => {
-            console.error('Video element error:', error);
-            showCameraError('Camera feed error. Please try restarting the camera.');
-            stopCamera();
-        });
 
         startCameraBtn.addEventListener('click', async () => {
             clearCameraStatus();
@@ -322,9 +302,7 @@
             }
         });
 
-        stopCameraBtn.addEventListener('click', stopCamera);
-
-        function stopCamera() {
+        stopCameraBtn.addEventListener('click', () => {
             cleanupCamera();
             startCameraBtn.classList.remove('hidden');
             startCameraBtn.disabled = false;
@@ -333,7 +311,7 @@
             captureImageBtn.disabled = true;
             showStatus('Camera stopped.', false);
             clearCameraStatus();
-        }
+        });
 
         // Add touch event handling for better mobile experience
         captureImageBtn.addEventListener('touchstart', (e) => {
