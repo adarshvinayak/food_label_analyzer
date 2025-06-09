@@ -49,6 +49,29 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+        #cameraContainer.max-h-none {
+            max-height: none !important;
+            height: 100vh;
+        }
+        
+        #cameraContainer:fullscreen {
+            background: black;
+            padding: 0;
+            margin: 0;
+            width: 100vw;
+            height: 100vh;
+        }
+        
+        #cameraContainer:fullscreen video,
+        #cameraContainer:fullscreen img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+        
+        #toggleFullscreenBtn {
+            z-index: 1000;
+        }
     </style>
 </head>
 <body class="bg-slate-100 text-slate-800 min-h-screen flex flex-col items-center pt-8 pb-16 px-4">
@@ -90,9 +113,17 @@
                             <button id="stopCameraBtn" class="flex-1 bg-orange-500 hover:bg-orange-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md transition duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-orange-400 hidden">Stop Camera</button>
                             <button id="switchCameraBtn" class="flex-1 bg-purple-500 hover:bg-purple-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md transition duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-purple-400 hidden">🔄 Switch Camera</button>
                         </div>
-                        <div class="bg-slate-200 rounded-lg overflow-hidden shadow-inner aspect-video max-h-[400px] mx-auto">
-                            <video id="cameraFeed" playsinline class="w-full h-full object-cover"></video>
-                            <div id="cameraStatusMessage" class="text-center text-sm text-red-500 mt-2 hidden"></div>
+                        <div class="relative">
+                            <div id="cameraContainer" class="bg-slate-200 rounded-lg overflow-hidden shadow-inner aspect-video max-h-[400px] mx-auto transition-all duration-300">
+                                <video id="cameraFeed" playsinline class="w-full h-full object-cover"></video>
+                                <img id="capturedImage" class="w-full h-full object-contain hidden" alt="Captured Image">
+                                <div id="cameraStatusMessage" class="text-center text-sm text-red-500 mt-2 hidden"></div>
+                            </div>
+                            <button id="toggleFullscreenBtn" class="absolute top-2 right-2 bg-black bg-opacity-50 text-white p-2 rounded-full hover:bg-opacity-75 transition-opacity">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 4h-4m4 0l-5-5" />
+                                </svg>
+                            </button>
                         </div>
                         <button id="captureImageBtn" class="w-full bg-green-500 hover:bg-green-600 text-white font-semibold py-3 px-6 rounded-lg shadow-md transition duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-green-400 hidden">
                             📸 Capture Image
@@ -159,6 +190,7 @@
 
         let cameraStream = null;
         let currentFacingMode = 'environment';
+        let isFullscreen = false;
 
         // Update the camera feed style to handle orientation
         cameraFeed.style.transform = currentFacingMode === 'user' ? 'scaleX(-1)' : 'none';
@@ -286,51 +318,38 @@
             }
         });
 
-        // Improved start camera handler
-        startCameraBtn.addEventListener('click', async () => {
-            clearCameraStatus();
-            showStatus('Initializing camera...', false);
-            startCameraBtn.disabled = true;
+        // Add fullscreen toggle functionality
+        const toggleFullscreenBtn = document.getElementById('toggleFullscreenBtn');
+        const cameraContainer = document.getElementById('cameraContainer');
 
-            try {
-                const success = await initializeCamera(currentFacingMode);
-                
-                if (success) {
-                    cameraFeed.classList.remove('hidden');
-                    startCameraBtn.classList.add('hidden');
-                    stopCameraBtn.classList.remove('hidden');
-                    captureImageBtn.classList.remove('hidden');
-                    switchCameraBtn.classList.remove('hidden');
-                    captureImageBtn.disabled = false;
-                    showStatus('Camera started. Position the ingredients label.', false);
-                } else {
-                    throw new Error('Failed to initialize camera');
+        toggleFullscreenBtn.addEventListener('click', () => {
+            if (!isFullscreen) {
+                if (cameraContainer.requestFullscreen) {
+                    cameraContainer.requestFullscreen();
+                } else if (cameraContainer.webkitRequestFullscreen) {
+                    cameraContainer.webkitRequestFullscreen();
+                } else if (cameraContainer.msRequestFullscreen) {
+                    cameraContainer.msRequestFullscreen();
                 }
-            } catch (error) {
-                console.error('Camera error:', error);
-                showCameraError('Failed to start camera. Please check permissions and try again.');
-                showStatus('Camera failed to start.', true);
-                startCameraBtn.disabled = false;
-                cleanupCamera();
+                cameraContainer.classList.add('max-h-none');
+            } else {
+                if (document.exitFullscreen) {
+                    document.exitFullscreen();
+                } else if (document.webkitExitFullscreen) {
+                    document.webkitExitFullscreen();
+                } else if (document.msExitFullscreen) {
+                    document.msExitFullscreen();
+                }
+                cameraContainer.classList.remove('max-h-none');
             }
         });
 
-        // Improved stop camera handler
-        function stopCamera() {
-            cleanupCamera();
-            startCameraBtn.classList.remove('hidden');
-            startCameraBtn.disabled = false;
-            stopCameraBtn.classList.add('hidden');
-            captureImageBtn.classList.add('hidden');
-            switchCameraBtn.classList.add('hidden');
-            captureImageBtn.disabled = true;
-            showStatus('Camera stopped.', false);
-            clearCameraStatus();
-        }
+        // Update fullscreen state
+        document.addEventListener('fullscreenchange', () => {
+            isFullscreen = !!document.fullscreenElement;
+        });
 
-        stopCameraBtn.addEventListener('click', stopCamera);
-
-        // Update the capture image functionality to handle orientation
+        // Update capture image functionality
         captureImageBtn.addEventListener('click', () => {
             if (!cameraStream || cameraFeed.videoWidth === 0) {
                 showCameraError('Camera not active or video feed is empty. Please ensure camera is streaming.');
@@ -355,24 +374,96 @@
                 }
 
                 const imageDataUrl = imageCanvas.toDataURL('image/png');
+                
+                // Show captured image in the camera container
+                const capturedImage = document.getElementById('capturedImage');
+                capturedImage.src = imageDataUrl;
+                capturedImage.classList.remove('hidden');
+                cameraFeed.classList.add('hidden');
+                
+                // Update preview and start OCR
                 imagePreview.src = imageDataUrl;
                 imagePreview.classList.remove('hidden');
                 ingredientsTextarea.value = '';
                 analysisOutputDiv.innerHTML = '';
                 showStatus('Image captured. Performing OCR via backend...', false);
                 performOcrWithBackend(imageDataUrl.split(',')[1]);
-                stopCamera();
+                
+                // Stop camera but keep the captured image visible
+                cleanupCamera();
+                startCameraBtn.classList.remove('hidden');
+                startCameraBtn.disabled = false;
+                stopCameraBtn.classList.add('hidden');
+                captureImageBtn.classList.add('hidden');
+                switchCameraBtn.classList.add('hidden');
             } catch (error) {
                 console.error('Error capturing image:', error);
                 showCameraError('Failed to capture image. Please try again.');
             }
         });
 
-        // Add proper mobile viewport handling
-        const meta = document.createElement('meta');
-        meta.name = 'viewport';
-        meta.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
-        document.head.appendChild(meta);
+        // Update start camera to reset captured image
+        startCameraBtn.addEventListener('click', async () => {
+            clearCameraStatus();
+            showStatus('Initializing camera...', false);
+            startCameraBtn.disabled = true;
+
+            // Hide captured image if it exists
+            const capturedImage = document.getElementById('capturedImage');
+            capturedImage.classList.add('hidden');
+            cameraFeed.classList.remove('hidden');
+
+            try {
+                const success = await initializeCamera(currentFacingMode);
+                
+                if (success) {
+                    cameraFeed.classList.remove('hidden');
+                    startCameraBtn.classList.add('hidden');
+                    stopCameraBtn.classList.remove('hidden');
+                    captureImageBtn.classList.remove('hidden');
+                    switchCameraBtn.classList.remove('hidden');
+                    captureImageBtn.disabled = false;
+                    showStatus('Camera started. Position the ingredients label.', false);
+                } else {
+                    throw new Error('Failed to initialize camera');
+                }
+            } catch (error) {
+                console.error('Camera error:', error);
+                showCameraError('Failed to start camera. Please check permissions and try again.');
+                showStatus('Camera failed to start.', true);
+                startCameraBtn.disabled = false;
+                cleanupCamera();
+            }
+        });
+
+        // Add CSS for fullscreen mode
+        const style = document.createElement('style');
+        style.textContent = `
+            #cameraContainer.max-h-none {
+                max-height: none !important;
+                height: 100vh;
+            }
+            
+            #cameraContainer:fullscreen {
+                background: black;
+                padding: 0;
+                margin: 0;
+                width: 100vw;
+                height: 100vh;
+            }
+            
+            #cameraContainer:fullscreen video,
+            #cameraContainer:fullscreen img {
+                width: 100%;
+                height: 100%;
+                object-fit: contain;
+            }
+            
+            #toggleFullscreenBtn {
+                z-index: 1000;
+            }
+        `;
+        document.head.appendChild(style);
 
         // --- OCR FUNCTION (Calls Backend) ---
         async function performOcrWithBackend(base64ImageData) {
