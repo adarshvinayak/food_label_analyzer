@@ -534,7 +534,7 @@
                 });
                 
                 if (!response.ok) {
-                    const errorResult = await response.json().catch(() => ({ message: "Unknown error from OCR backend." }));
+                    const errorResult = await response.json().catch(() => ({ message: "Unknown error from OCR backend. Try again." }));
                     throw new Error(errorResult.message || `OCR backend request failed with status ${response.status}`);
                 }
                 
@@ -548,7 +548,7 @@
                     showStatus('OCR successful! Review the text and click Analyze.', false);
                 } else {
                     ingredientsTextarea.value = '';
-                    showStatus('No text detected by OCR or unexpected backend response.', false);
+                    showStatus('No text detected by OCR or unexpected backend response. Try again.', false);
                 }
             } catch (error) {
                 console.error('Error calling OCR backend:', error);
@@ -567,7 +567,7 @@
                 return;
             }
             
-            showStatus('Analyzing ingredients with AI (via backend), please wait...', false);
+            showStatus('Analyzing ingredients with AI, please wait...', false);
             setLoading(analyzeBtnText, analyzeLoader, true, '✨ Analyze Ingredients');
             analysisOutputDiv.innerHTML = '';
 
@@ -580,7 +580,7 @@
                 });
 
                 if (!response.ok) {
-                    const errorResult = await response.json().catch(() => ({ message: "Unknown error from analysis backend." }));
+                    const errorResult = await response.json().catch(() => ({ message: "Unknown error from analysis backend. Try again." }));
                     throw new Error(errorResult.message || `Analysis backend request failed with status ${response.status}`);
                 }
 
