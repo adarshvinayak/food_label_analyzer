@@ -49,29 +49,6 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
-        #cameraContainer.max-h-none {
-            max-height: none !important;
-            height: 100vh;
-        }
-        
-        #cameraContainer:fullscreen {
-            background: black;
-            padding: 0;
-            margin: 0;
-            width: 100vw;
-            height: 100vh;
-        }
-        
-        #cameraContainer:fullscreen video,
-        #cameraContainer:fullscreen img {
-            width: 100%;
-            height: 100%;
-            object-fit: contain;
-        }
-        
-        #toggleFullscreenBtn {
-            z-index: 1000;
-        }
     </style>
 </head>
 <body class="bg-slate-100 text-slate-800 min-h-screen flex flex-col items-center pt-8 pb-16 px-4">
@@ -113,17 +90,9 @@
                             <button id="stopCameraBtn" class="flex-1 bg-orange-500 hover:bg-orange-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md transition duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-orange-400 hidden">Stop Camera</button>
                             <button id="switchCameraBtn" class="flex-1 bg-purple-500 hover:bg-purple-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md transition duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-purple-400 hidden">🔄 Switch Camera</button>
                         </div>
-                        <div class="relative">
-                            <div id="cameraContainer" class="bg-slate-200 rounded-lg overflow-hidden shadow-inner aspect-video max-h-[400px] mx-auto transition-all duration-300">
-                                <video id="cameraFeed" playsinline class="w-full h-full object-cover"></video>
-                                <img id="capturedImage" class="w-full h-full object-contain hidden" alt="Captured Image">
-                                <div id="cameraStatusMessage" class="text-center text-sm text-red-500 mt-2 hidden"></div>
-                            </div>
-                            <button id="toggleExpandBtn" class="absolute top-2 right-2 bg-black bg-opacity-50 text-white p-2 rounded-full hover:bg-opacity-75 transition-opacity hidden">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 4h-4m4 0l-5-5" />
-                                </svg>
-                            </button>
+                        <div class="bg-slate-200 rounded-lg overflow-hidden shadow-inner aspect-video max-h-[400px] mx-auto">
+                            <video id="cameraFeed" playsinline class="w-full h-full object-cover"></video>
+                            <div id="cameraStatusMessage" class="text-center text-sm text-red-500 mt-2 hidden"></div>
                         </div>
                         <button id="captureImageBtn" class="w-full bg-green-500 hover:bg-green-600 text-white font-semibold py-3 px-6 rounded-lg shadow-md transition duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-green-400 hidden">
                             📸 Capture Image
@@ -190,7 +159,6 @@
 
         let cameraStream = null;
         let currentFacingMode = 'environment';
-        let isExpanded = false;
 
         // Update the camera feed style to handle orientation
         cameraFeed.style.transform = currentFacingMode === 'user' ? 'scaleX(-1)' : 'none';
@@ -318,113 +286,51 @@
             }
         });
 
-        // Add expand/collapse functionality
-        const toggleExpandBtn = document.getElementById('toggleExpandBtn');
-        const cameraContainer = document.getElementById('cameraContainer');
+        // Improved start camera handler
+        startCameraBtn.addEventListener('click', async () => {
+            clearCameraStatus();
+            showStatus('Initializing camera...', false);
+            startCameraBtn.disabled = true;
 
-        toggleExpandBtn.addEventListener('click', () => {
-            isExpanded = !isExpanded;
-            if (isExpanded) {
-                cameraContainer.classList.add('expanded');
-                toggleExpandBtn.innerHTML = `
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                `;
-            } else {
-                cameraContainer.classList.remove('expanded');
-                toggleExpandBtn.innerHTML = `
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 4h-4m4 0l-5-5" />
-                    </svg>
-                `;
+            try {
+                const success = await initializeCamera(currentFacingMode);
+                
+                if (success) {
+                    cameraFeed.classList.remove('hidden');
+                    startCameraBtn.classList.add('hidden');
+                    stopCameraBtn.classList.remove('hidden');
+                    captureImageBtn.classList.remove('hidden');
+                    switchCameraBtn.classList.remove('hidden');
+                    captureImageBtn.disabled = false;
+                    showStatus('Camera started. Position the ingredients label.', false);
+                } else {
+                    throw new Error('Failed to initialize camera');
+                }
+            } catch (error) {
+                console.error('Camera error:', error);
+                showCameraError('Failed to start camera. Please check permissions and try again.');
+                showStatus('Camera failed to start.', true);
+                startCameraBtn.disabled = false;
+                cleanupCamera();
             }
         });
 
-        // Add CSS for expanded mode
-        const style = document.createElement('style');
-        style.textContent = `
-            #cameraContainer {
-                transition: all 0.3s ease-in-out;
-            }
-            
-            #cameraContainer.expanded {
-                position: fixed;
-                top: 50%;
-                left: 50%;
-                transform: translate(-50%, -50%);
-                width: 90vw;
-                height: 80vh;
-                max-width: 1200px;
-                z-index: 1000;
-                background: black;
-            }
-            
-            #cameraContainer.expanded video,
-            #cameraContainer.expanded img {
-                width: 100%;
-                height: 100%;
-                object-fit: contain;
-            }
-            
-            #toggleExpandBtn {
-                z-index: 1001;
-            }
-            
-            #captureImageBtn {
-                z-index: 1001;
-            }
-        `;
-        document.head.appendChild(style);
-
-        // Fix stop camera functionality
+        // Improved stop camera handler
         function stopCamera() {
-            if (cameraStream) {
-                cameraStream.getTracks().forEach(track => {
-                    track.stop();
-                });
-                cameraStream = null;
-                cameraFeed.srcObject = null;
-            }
-            
-            // Reset UI
+            cleanupCamera();
             startCameraBtn.classList.remove('hidden');
             startCameraBtn.disabled = false;
             stopCameraBtn.classList.add('hidden');
             captureImageBtn.classList.add('hidden');
             switchCameraBtn.classList.add('hidden');
-            
-            // Hide expand button
-            const toggleExpandBtn = document.getElementById('toggleExpandBtn');
-            toggleExpandBtn.classList.add('hidden');
-            toggleExpandBtn.style.display = 'none';
-            
-            // Hide captured image if it exists
-            const capturedImage = document.getElementById('capturedImage');
-            capturedImage.classList.add('hidden');
-            cameraFeed.classList.remove('hidden');
-            
+            captureImageBtn.disabled = true;
             showStatus('Camera stopped.', false);
             clearCameraStatus();
         }
 
-        // Update stop camera button event listener
         stopCameraBtn.addEventListener('click', stopCamera);
 
-        // Handle escape key for expanded view
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' && isExpanded) {
-                cameraContainer.classList.remove('expanded');
-                isExpanded = false;
-                toggleExpandBtn.innerHTML = `
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 4h-4m4 0l-5-5" />
-                    </svg>
-                `;
-            }
-        });
-
-        // Update capture image functionality
+        // Update the capture image functionality to handle orientation
         captureImageBtn.addEventListener('click', () => {
             if (!cameraStream || cameraFeed.videoWidth === 0) {
                 showCameraError('Camera not active or video feed is empty. Please ensure camera is streaming.');
@@ -449,71 +355,24 @@
                 }
 
                 const imageDataUrl = imageCanvas.toDataURL('image/png');
-                
-                // Show captured image in the camera container
-                const capturedImage = document.getElementById('capturedImage');
-                capturedImage.src = imageDataUrl;
-                capturedImage.classList.remove('hidden');
-                cameraFeed.classList.add('hidden');
-                
-                // Update preview and start OCR
                 imagePreview.src = imageDataUrl;
                 imagePreview.classList.remove('hidden');
                 ingredientsTextarea.value = '';
                 analysisOutputDiv.innerHTML = '';
                 showStatus('Image captured. Performing OCR via backend...', false);
                 performOcrWithBackend(imageDataUrl.split(',')[1]);
-                
-                // Stop camera but keep the captured image visible
-                cleanupCamera();
-                startCameraBtn.classList.remove('hidden');
-                startCameraBtn.disabled = false;
-                stopCameraBtn.classList.add('hidden');
-                captureImageBtn.classList.add('hidden');
-                switchCameraBtn.classList.add('hidden');
+                stopCamera();
             } catch (error) {
                 console.error('Error capturing image:', error);
                 showCameraError('Failed to capture image. Please try again.');
             }
         });
 
-        // Update start camera to show expand button
-        startCameraBtn.addEventListener('click', async () => {
-            clearCameraStatus();
-            showStatus('Initializing camera...', false);
-            startCameraBtn.disabled = true;
-
-            try {
-                const success = await initializeCamera(currentFacingMode);
-                
-                if (success) {
-                    // Show camera feed
-                    cameraFeed.classList.remove('hidden');
-                    
-                    // Update button visibility
-                    startCameraBtn.classList.add('hidden');
-                    stopCameraBtn.classList.remove('hidden');
-                    captureImageBtn.classList.remove('hidden');
-                    switchCameraBtn.classList.remove('hidden');
-                    
-                    // Make sure expand button is visible
-                    const toggleExpandBtn = document.getElementById('toggleExpandBtn');
-                    toggleExpandBtn.classList.remove('hidden');
-                    toggleExpandBtn.style.display = 'block'; // Add explicit display
-                    
-                    captureImageBtn.disabled = false;
-                    showStatus('Camera started. Position the ingredients label.', false);
-                } else {
-                    throw new Error('Failed to initialize camera');
-                }
-            } catch (error) {
-                console.error('Camera error:', error);
-                showCameraError('Failed to start camera. Please check permissions and try again.');
-                showStatus('Camera failed to start.', true);
-                startCameraBtn.disabled = false;
-                cleanupCamera();
-            }
-        });
+        // Add proper mobile viewport handling
+        const meta = document.createElement('meta');
+        meta.name = 'viewport';
+        meta.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
+        document.head.appendChild(meta);
 
         // --- OCR FUNCTION (Calls Backend) ---
         async function performOcrWithBackend(base64ImageData) {
@@ -703,163 +562,6 @@
         // Handle tab close
         window.addEventListener('unload', () => {
             cleanupCamera();
-        });
-
-        // Create modal for expanded view with proper structure
-        const modal = document.createElement('div');
-        modal.id = 'cameraModal';
-        modal.className = 'fixed inset-0 bg-black bg-opacity-90 z-50 hidden';
-        modal.innerHTML = `
-            <div class="fixed inset-0 flex flex-col">
-                <div class="relative flex-1">
-                    <video id="modalCameraFeed" playsinline class="w-full h-full object-contain"></video>
-                    <img id="modalCapturedImage" class="w-full h-full object-contain hidden" alt="Captured Image">
-                    <button id="closeModalBtn" class="absolute top-4 right-4 bg-black bg-opacity-50 text-white p-3 rounded-full hover:bg-opacity-75 transition-opacity z-50">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                    </button>
-                </div>
-                <div class="fixed bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black to-transparent">
-                    <button id="modalCaptureBtn" class="w-full bg-green-500 hover:bg-green-600 text-white font-semibold py-4 px-6 text-lg rounded-lg shadow-lg">
-                        📸 Capture Image
-                    </button>
-                </div>
-            </div>
-        `;
-        document.body.appendChild(modal);
-
-        // Update the CSS for proper modal styling
-        const style = document.createElement('style');
-        style.textContent = `
-            #cameraModal {
-                transition: opacity 0.3s ease-in-out;
-            }
-            
-            #cameraModal.hidden {
-                opacity: 0;
-                pointer-events: none;
-            }
-            
-            #cameraModal:not(.hidden) {
-                opacity: 1;
-            }
-            
-            #modalCameraFeed,
-            #modalCapturedImage {
-                max-height: calc(100vh - 120px); /* Account for capture button height */
-                width: 100%;
-                object-fit: contain;
-            }
-            
-            #closeModalBtn {
-                z-index: 1001;
-                backdrop-filter: blur(4px);
-            }
-            
-            #modalCaptureBtn {
-                z-index: 1001;
-                backdrop-filter: blur(4px);
-            }
-
-            /* Add styles for expand button */
-            #toggleExpandBtn {
-                position: absolute;
-                top: 8px;
-                right: 8px;
-                background-color: rgba(0, 0, 0, 0.5);
-                color: white;
-                padding: 8px;
-                border-radius: 9999px;
-                cursor: pointer;
-                z-index: 1000;
-                display: none;
-                backdrop-filter: blur(4px);
-            }
-
-            #toggleExpandBtn:hover {
-                background-color: rgba(0, 0, 0, 0.75);
-            }
-
-            #toggleExpandBtn:not(.hidden) {
-                display: block !important;
-            }
-
-            /* Ensure modal content is properly positioned */
-            #cameraModal > div {
-                height: 100vh;
-                width: 100vw;
-                position: fixed;
-                top: 0;
-                left: 0;
-            }
-
-            /* Add gradient overlay for better button visibility */
-            #cameraModal::after {
-                content: '';
-                position: fixed;
-                bottom: 0;
-                left: 0;
-                right: 0;
-                height: 120px;
-                background: linear-gradient(to top, rgba(0,0,0,0.8), transparent);
-                pointer-events: none;
-            }
-        `;
-        document.head.appendChild(style);
-
-        // Update modal capture button handler
-        document.getElementById('modalCaptureBtn').addEventListener('click', () => {
-            const modalCameraFeed = document.getElementById('modalCameraFeed');
-            const context = imageCanvas.getContext('2d');
-            imageCanvas.width = modalCameraFeed.videoWidth;
-            imageCanvas.height = modalCameraFeed.videoHeight;
-
-            // Handle orientation for capture
-            if (currentFacingMode === 'user') {
-                context.save();
-                context.translate(imageCanvas.width, 0);
-                context.scale(-1, 1);
-                context.drawImage(modalCameraFeed, 0, 0, imageCanvas.width, imageCanvas.height);
-                context.restore();
-            } else {
-                context.drawImage(modalCameraFeed, 0, 0, imageCanvas.width, imageCanvas.height);
-            }
-
-            const imageDataUrl = imageCanvas.toDataURL('image/png');
-            
-            // Show captured image in both modal and container
-            const capturedImage = document.getElementById('capturedImage');
-            const modalCapturedImage = document.getElementById('modalCapturedImage');
-            
-            capturedImage.src = imageDataUrl;
-            modalCapturedImage.src = imageDataUrl;
-            
-            capturedImage.classList.remove('hidden');
-            modalCapturedImage.classList.remove('hidden');
-            modalCameraFeed.classList.add('hidden');
-            
-            // Update preview and start OCR
-            imagePreview.src = imageDataUrl;
-            imagePreview.classList.remove('hidden');
-            ingredientsTextarea.value = '';
-            analysisOutputDiv.innerHTML = '';
-            showStatus('Image captured. Performing OCR via backend...', false);
-            performOcrWithBackend(imageDataUrl.split(',')[1]);
-            
-            // Close modal and stop camera
-            modal.classList.add('hidden');
-            stopCamera();
-        });
-
-        // Handle close modal with proper cleanup
-        document.getElementById('closeModalBtn').addEventListener('click', () => {
-            modal.classList.add('hidden');
-            // Reset modal state
-            const modalCameraFeed = document.getElementById('modalCameraFeed');
-            const modalCapturedImage = document.getElementById('modalCapturedImage');
-            modalCameraFeed.classList.remove('hidden');
-            modalCapturedImage.classList.add('hidden');
         });
 
     </script>
