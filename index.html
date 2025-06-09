@@ -119,7 +119,7 @@
                                 <img id="capturedImage" class="w-full h-full object-contain hidden" alt="Captured Image">
                                 <div id="cameraStatusMessage" class="text-center text-sm text-red-500 mt-2 hidden"></div>
                             </div>
-                            <button id="toggleFullscreenBtn" class="absolute top-2 right-2 bg-black bg-opacity-50 text-white p-2 rounded-full hover:bg-opacity-75 transition-opacity">
+                            <button id="toggleExpandBtn" class="absolute top-2 right-2 bg-black bg-opacity-50 text-white p-2 rounded-full hover:bg-opacity-75 transition-opacity">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 4h-4m4 0l-5-5" />
                                 </svg>
@@ -190,7 +190,7 @@
 
         let cameraStream = null;
         let currentFacingMode = 'environment';
-        let isFullscreen = false;
+        let isExpanded = false;
 
         // Update the camera feed style to handle orientation
         cameraFeed.style.transform = currentFacingMode === 'user' ? 'scaleX(-1)' : 'none';
@@ -318,35 +318,116 @@
             }
         });
 
-        // Add fullscreen toggle functionality
-        const toggleFullscreenBtn = document.getElementById('toggleFullscreenBtn');
+        // Add expand/collapse functionality
+        const toggleExpandBtn = document.getElementById('toggleExpandBtn');
         const cameraContainer = document.getElementById('cameraContainer');
 
-        toggleFullscreenBtn.addEventListener('click', () => {
-            if (!isFullscreen) {
-                if (cameraContainer.requestFullscreen) {
-                    cameraContainer.requestFullscreen();
-                } else if (cameraContainer.webkitRequestFullscreen) {
-                    cameraContainer.webkitRequestFullscreen();
-                } else if (cameraContainer.msRequestFullscreen) {
-                    cameraContainer.msRequestFullscreen();
-                }
-                cameraContainer.classList.add('max-h-none');
+        toggleExpandBtn.addEventListener('click', () => {
+            isExpanded = !isExpanded;
+            if (isExpanded) {
+                cameraContainer.classList.add('expanded');
+                toggleExpandBtn.innerHTML = `
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                `;
             } else {
-                if (document.exitFullscreen) {
-                    document.exitFullscreen();
-                } else if (document.webkitExitFullscreen) {
-                    document.webkitExitFullscreen();
-                } else if (document.msExitFullscreen) {
-                    document.msExitFullscreen();
-                }
-                cameraContainer.classList.remove('max-h-none');
+                cameraContainer.classList.remove('expanded');
+                toggleExpandBtn.innerHTML = `
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 4h-4m4 0l-5-5" />
+                    </svg>
+                `;
             }
         });
 
-        // Update fullscreen state
-        document.addEventListener('fullscreenchange', () => {
-            isFullscreen = !!document.fullscreenElement;
+        // Add CSS for expanded mode
+        const style = document.createElement('style');
+        style.textContent = `
+            #cameraContainer {
+                transition: all 0.3s ease-in-out;
+            }
+            
+            #cameraContainer.expanded {
+                position: fixed;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                width: 90vw;
+                height: 80vh;
+                max-width: 1200px;
+                z-index: 1000;
+                background: black;
+            }
+            
+            #cameraContainer.expanded video,
+            #cameraContainer.expanded img {
+                width: 100%;
+                height: 100%;
+                object-fit: contain;
+            }
+            
+            #toggleExpandBtn {
+                z-index: 1001;
+            }
+            
+            #captureImageBtn {
+                z-index: 1001;
+            }
+        `;
+        document.head.appendChild(style);
+
+        // Fix stop camera functionality
+        function stopCamera() {
+            if (cameraStream) {
+                cameraStream.getTracks().forEach(track => {
+                    track.stop();
+                });
+                cameraStream = null;
+                cameraFeed.srcObject = null;
+            }
+            
+            // Reset UI
+            startCameraBtn.classList.remove('hidden');
+            startCameraBtn.disabled = false;
+            stopCameraBtn.classList.add('hidden');
+            captureImageBtn.classList.add('hidden');
+            switchCameraBtn.classList.add('hidden');
+            
+            // Reset camera container
+            if (isExpanded) {
+                cameraContainer.classList.remove('expanded');
+                isExpanded = false;
+                toggleExpandBtn.innerHTML = `
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 4h-4m4 0l-5-5" />
+                    </svg>
+                `;
+            }
+            
+            // Hide captured image if it exists
+            const capturedImage = document.getElementById('capturedImage');
+            capturedImage.classList.add('hidden');
+            cameraFeed.classList.remove('hidden');
+            
+            showStatus('Camera stopped.', false);
+            clearCameraStatus();
+        }
+
+        // Update stop camera button event listener
+        stopCameraBtn.addEventListener('click', stopCamera);
+
+        // Handle escape key for expanded view
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && isExpanded) {
+                cameraContainer.classList.remove('expanded');
+                isExpanded = false;
+                toggleExpandBtn.innerHTML = `
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 4h-4m4 0l-5-5" />
+                    </svg>
+                `;
+            }
         });
 
         // Update capture image functionality
@@ -435,35 +516,6 @@
                 cleanupCamera();
             }
         });
-
-        // Add CSS for fullscreen mode
-        const style = document.createElement('style');
-        style.textContent = `
-            #cameraContainer.max-h-none {
-                max-height: none !important;
-                height: 100vh;
-            }
-            
-            #cameraContainer:fullscreen {
-                background: black;
-                padding: 0;
-                margin: 0;
-                width: 100vw;
-                height: 100vh;
-            }
-            
-            #cameraContainer:fullscreen video,
-            #cameraContainer:fullscreen img {
-                width: 100%;
-                height: 100%;
-                object-fit: contain;
-            }
-            
-            #toggleFullscreenBtn {
-                z-index: 1000;
-            }
-        `;
-        document.head.appendChild(style);
 
         // --- OCR FUNCTION (Calls Backend) ---
         async function performOcrWithBackend(base64ImageData) {
