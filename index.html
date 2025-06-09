@@ -152,15 +152,15 @@
         const analysisOutputDiv = document.getElementById('analysisOutput');
 
         let cameraStream = null;
+        let currentFacingMode = 'environment'; // Track current camera mode
 
         // --- TAB SWITCHING LOGIC ---
         tabUpload.addEventListener('click', () => {
+            stopCamera(); // Ensure camera is stopped when switching to upload tab
             uploadContent.classList.remove('hidden');
             cameraContent.classList.add('hidden');
             tabUpload.classList.add('active');
             tabCamera.classList.remove('active');
-            stopCamera(); // Ensure camera is stopped when switching tabs
-            clearCameraStatus(); // Clear any camera errors
         });
 
         tabCamera.addEventListener('click', () => {
@@ -222,36 +222,24 @@
         });
 
         // --- CAMERA HANDLING ---
-        // Simplified camera initialization
-        async function initializeCamera() {
+        // Improved camera initialization with camera switching support
+        async function initializeCamera(facingMode = 'environment') {
             if (cameraStream) {
                 cleanupCamera();
             }
 
             try {
-                // Try to get the rear camera first
-                const devices = await navigator.mediaDevices.enumerateDevices();
-                const videoDevices = devices.filter(device => device.kind === 'videoinput');
-                
-                // Default constraints
-                let constraints = {
+                const constraints = {
                     video: {
                         width: { ideal: 1280 },
-                        height: { ideal: 720 }
+                        height: { ideal: 720 },
+                        facingMode: facingMode
                     }
                 };
 
-                // If we have multiple cameras, try to use the rear one
-                if (videoDevices.length > 1) {
-                    constraints.video.facingMode = 'environment';
-                }
-
                 cameraStream = await navigator.mediaDevices.getUserMedia(constraints);
-                
-                // Set up the video stream
                 cameraFeed.srcObject = cameraStream;
                 
-                // Wait for the video to be ready
                 return new Promise((resolve) => {
                     cameraFeed.onloadedmetadata = () => {
                         cameraFeed.play()
@@ -275,19 +263,37 @@
             }
         }
 
+        // Add camera switch button
+        const switchCameraBtn = document.createElement('button');
+        switchCameraBtn.id = 'switchCameraBtn';
+        switchCameraBtn.className = 'flex-1 bg-purple-500 hover:bg-purple-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md transition duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-purple-400 hidden';
+        switchCameraBtn.innerHTML = '🔄 Switch Camera';
+        document.querySelector('#cameraContent .flex').appendChild(switchCameraBtn);
+
+        // Handle camera switching
+        switchCameraBtn.addEventListener('click', async () => {
+            currentFacingMode = currentFacingMode === 'environment' ? 'user' : 'environment';
+            const success = await initializeCamera(currentFacingMode);
+            if (!success) {
+                showCameraError('Failed to switch camera. Please try again.');
+            }
+        });
+
+        // Improved start camera handler
         startCameraBtn.addEventListener('click', async () => {
             clearCameraStatus();
             showStatus('Initializing camera...', false);
             startCameraBtn.disabled = true;
 
             try {
-                const success = await initializeCamera();
+                const success = await initializeCamera(currentFacingMode);
                 
                 if (success) {
                     cameraFeed.classList.remove('hidden');
                     startCameraBtn.classList.add('hidden');
                     stopCameraBtn.classList.remove('hidden');
                     captureImageBtn.classList.remove('hidden');
+                    switchCameraBtn.classList.remove('hidden');
                     captureImageBtn.disabled = false;
                     showStatus('Camera started. Position the ingredients label.', false);
                 } else {
@@ -302,52 +308,50 @@
             }
         });
 
-        stopCameraBtn.addEventListener('click', () => {
+        // Improved stop camera handler
+        function stopCamera() {
             cleanupCamera();
             startCameraBtn.classList.remove('hidden');
             startCameraBtn.disabled = false;
             stopCameraBtn.classList.add('hidden');
             captureImageBtn.classList.add('hidden');
+            switchCameraBtn.classList.add('hidden');
             captureImageBtn.disabled = true;
             showStatus('Camera stopped.', false);
             clearCameraStatus();
-        });
+        }
 
-        // Add touch event handling for better mobile experience
-        captureImageBtn.addEventListener('touchstart', (e) => {
-            e.preventDefault(); // Prevent double-firing on mobile
-            captureImageBtn.click();
-        });
+        stopCameraBtn.addEventListener('click', stopCamera);
 
-        // Debounce the capture button
-        captureImageBtn.addEventListener('click', debounce(() => {
+        // Fix capture image functionality
+        captureImageBtn.addEventListener('click', () => {
             if (!cameraStream || cameraFeed.videoWidth === 0) {
                 showCameraError('Camera not active or video feed is empty. Please ensure camera is streaming.');
                 showStatus('Cannot capture: Camera not ready.', true);
                 return;
             }
             
-            const context = imageCanvas.getContext('2d');
-            imageCanvas.width = cameraFeed.videoWidth;
-            imageCanvas.height = cameraFeed.videoHeight;
+            try {
+                const context = imageCanvas.getContext('2d');
+                imageCanvas.width = cameraFeed.videoWidth;
+                imageCanvas.height = cameraFeed.videoHeight;
 
-            context.save();
-            if (cameraFeed.style.transform === 'scaleX(-1)') {
-                context.translate(imageCanvas.width, 0);
-                context.scale(-1, 1);
+                // Draw the current frame
+                context.drawImage(cameraFeed, 0, 0, imageCanvas.width, imageCanvas.height);
+
+                const imageDataUrl = imageCanvas.toDataURL('image/png');
+                imagePreview.src = imageDataUrl;
+                imagePreview.classList.remove('hidden');
+                ingredientsTextarea.value = '';
+                analysisOutputDiv.innerHTML = '';
+                showStatus('Image captured. Performing OCR via backend...', false);
+                performOcrWithBackend(imageDataUrl.split(',')[1]);
+                stopCamera();
+            } catch (error) {
+                console.error('Error capturing image:', error);
+                showCameraError('Failed to capture image. Please try again.');
             }
-            context.drawImage(cameraFeed, 0, 0, imageCanvas.width, imageCanvas.height);
-            context.restore();
-
-            const imageDataUrl = imageCanvas.toDataURL('image/png');
-            imagePreview.src = imageDataUrl;
-            imagePreview.classList.remove('hidden');
-            ingredientsTextarea.value = '';
-            analysisOutputDiv.innerHTML = '';
-            showStatus('Image captured. Performing OCR via backend...', false);
-            performOcrWithBackend(imageDataUrl.split(',')[1]);
-            stopCamera();
-        }, 300));
+        });
 
         // Add proper mobile viewport handling
         const meta = document.createElement('meta');
@@ -527,6 +531,23 @@
 
         // --- INITIALIZATION ---
         showStatus('Ready to analyze. Upload an image, use your camera, or type ingredients.', false);
+
+        // Handle visibility change (minimizing window)
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                stopCamera(); // Stop camera when window is minimized
+            }
+        });
+
+        // Handle page unload
+        window.addEventListener('beforeunload', () => {
+            cleanupCamera();
+        });
+
+        // Handle tab close
+        window.addEventListener('unload', () => {
+            cleanupCamera();
+        });
 
     </script>
 </body>
