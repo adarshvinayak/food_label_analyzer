@@ -394,16 +394,10 @@
             captureImageBtn.classList.add('hidden');
             switchCameraBtn.classList.add('hidden');
             
-            // Reset camera container
-            if (isExpanded) {
-                cameraContainer.classList.remove('expanded');
-                isExpanded = false;
-                toggleExpandBtn.innerHTML = `
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 4h-4m4 0l-5-5" />
-                    </svg>
-                `;
-            }
+            // Hide expand button
+            const toggleExpandBtn = document.getElementById('toggleExpandBtn');
+            toggleExpandBtn.classList.add('hidden');
+            toggleExpandBtn.style.display = 'none';
             
             // Hide captured image if it exists
             const capturedImage = document.getElementById('capturedImage');
@@ -483,26 +477,30 @@
             }
         });
 
-        // Update start camera to reset captured image
+        // Update start camera to show expand button
         startCameraBtn.addEventListener('click', async () => {
             clearCameraStatus();
             showStatus('Initializing camera...', false);
             startCameraBtn.disabled = true;
 
-            // Hide captured image if it exists
-            const capturedImage = document.getElementById('capturedImage');
-            capturedImage.classList.add('hidden');
-            cameraFeed.classList.remove('hidden');
-
             try {
                 const success = await initializeCamera(currentFacingMode);
                 
                 if (success) {
+                    // Show camera feed
                     cameraFeed.classList.remove('hidden');
+                    
+                    // Update button visibility
                     startCameraBtn.classList.add('hidden');
                     stopCameraBtn.classList.remove('hidden');
                     captureImageBtn.classList.remove('hidden');
                     switchCameraBtn.classList.remove('hidden');
+                    
+                    // Make sure expand button is visible
+                    const toggleExpandBtn = document.getElementById('toggleExpandBtn');
+                    toggleExpandBtn.classList.remove('hidden');
+                    toggleExpandBtn.style.display = 'block'; // Add explicit display
+                    
                     captureImageBtn.disabled = false;
                     showStatus('Camera started. Position the ingredients label.', false);
                 } else {
