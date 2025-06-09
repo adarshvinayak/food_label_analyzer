@@ -185,14 +185,14 @@
                         </button>
                         <canvas id="imageCanvas" class="hidden"></canvas>
                         
-                        <!-- New Image Preview Section -->
+                        <!-- Updated Image Preview Section -->
                         <div id="cameraPreviewSection" class="mt-4 hidden">
                             <h3 class="text-lg font-semibold text-teal-700 mb-2">Captured Image</h3>
                             <div class="relative bg-slate-200 rounded-lg overflow-hidden shadow-inner mx-auto" style="width: 100%; max-width: 400px;">
-                                <img id="cameraImagePreview" src="#" alt="Captured image" class="w-full h-full object-contain hidden">
-                                <div class="flex justify-center items-center h-32 text-slate-500">
+                                <div id="noImageMessage" class="flex justify-center items-center h-32 text-slate-500">
                                     No image captured yet
                                 </div>
+                                <img id="cameraImagePreview" src="#" alt="Captured image" class="w-full h-full object-contain hidden">
                             </div>
                             <div class="flex gap-2 mt-2 justify-center">
                                 <button id="retakePhotoBtn" class="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md transition duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-400 hidden">
@@ -431,11 +431,13 @@
             // Reset preview section
             const previewSection = document.getElementById('cameraPreviewSection');
             const cameraImagePreview = document.getElementById('cameraImagePreview');
+            const noImageMessage = document.getElementById('noImageMessage');
             const retakePhotoBtn = document.getElementById('retakePhotoBtn');
             const usePhotoBtn = document.getElementById('usePhotoBtn');
             
             previewSection.classList.add('hidden');
             cameraImagePreview.classList.add('hidden');
+            noImageMessage.classList.remove('hidden'); // Show the "no image" message again
             retakePhotoBtn.classList.add('hidden');
             usePhotoBtn.classList.add('hidden');
             cameraFeed.classList.remove('hidden');
@@ -467,10 +469,12 @@
                 // Show preview section
                 const previewSection = document.getElementById('cameraPreviewSection');
                 const cameraImagePreview = document.getElementById('cameraImagePreview');
+                const noImageMessage = document.getElementById('noImageMessage');
                 const retakePhotoBtn = document.getElementById('retakePhotoBtn');
                 const usePhotoBtn = document.getElementById('usePhotoBtn');
                 
                 previewSection.classList.remove('hidden');
+                noImageMessage.classList.add('hidden'); // Hide the "no image" message
                 cameraImagePreview.src = imageDataUrl;
                 cameraImagePreview.classList.remove('hidden');
                 retakePhotoBtn.classList.remove('hidden');
@@ -484,6 +488,7 @@
                 retakePhotoBtn.addEventListener('click', () => {
                     previewSection.classList.add('hidden');
                     cameraImagePreview.classList.add('hidden');
+                    noImageMessage.classList.remove('hidden'); // Show the "no image" message again
                     retakePhotoBtn.classList.add('hidden');
                     usePhotoBtn.classList.add('hidden');
                     cameraFeed.classList.remove('hidden');
