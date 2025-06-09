@@ -222,110 +222,137 @@
         });
 
         // --- CAMERA HANDLING ---
+        // Utility functions for camera handling
+        function cleanupCamera() {
+            if (cameraStream) {
+                cameraStream.getTracks().forEach(track => {
+                    track.stop();
+                });
+                cameraStream = null;
+                cameraFeed.srcObject = null;
+            }
+        }
+
+        async function initializeCamera() {
+            cleanupCamera(); // Clean up any existing stream
+            
+            const constraints = {
+                video: {
+                    width: { ideal: 1280 },
+                    height: { ideal: 720 },
+                    facingMode: 'environment'
+                }
+            };
+
+            try {
+                cameraStream = await navigator.mediaDevices.getUserMedia(constraints);
+                cameraFeed.srcObject = cameraStream;
+                
+                // Wait for video to be ready
+                await new Promise((resolve) => {
+                    cameraFeed.onloadedmetadata = () => {
+                        resolve();
+                    };
+                });
+
+                return true;
+            } catch (error) {
+                console.error('Camera initialization error:', error);
+                return false;
+            }
+        }
+
+        // Debounce utility function
+        function debounce(func, wait) {
+            let timeout;
+            return function executedFunction(...args) {
+                const later = () => {
+                    clearTimeout(timeout);
+                    func(...args);
+                };
+                clearTimeout(timeout);
+                timeout = setTimeout(later, wait);
+            };
+        }
+
+        // Add proper error boundaries
+        window.addEventListener('unhandledrejection', (event) => {
+            console.error('Unhandled promise rejection:', event.reason);
+            if (event.reason.name === 'NotAllowedError') {
+                showCameraError('Camera access was denied. Please allow camera access in your browser settings.');
+            }
+        });
+
+        // Add proper cleanup on page unload
+        window.addEventListener('beforeunload', () => {
+            cleanupCamera();
+        });
+
+        // Add error handling for video element
+        cameraFeed.addEventListener('error', (error) => {
+            console.error('Video element error:', error);
+            showCameraError('Camera feed error. Please try restarting the camera.');
+            stopCamera();
+        });
+
         startCameraBtn.addEventListener('click', async () => {
-            clearCameraStatus(); // Clear previous errors
-            showStatus('Attempting to start camera...', false);
-            // Disable start button immediately to prevent multiple clicks
+            clearCameraStatus();
+            showStatus('Initializing camera...', false);
             startCameraBtn.disabled = true;
 
-            if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-                try {
-                    // Reworked constraints for better compatibility:
-                    // Try 'environment' first for rear camera, then fall back to 'user' for front.
-                    // If both fail, try generic 'true'.
-                    let constraints = { video: { facingMode: 'environment' } }; // Try rear camera first
-
-                    try {
-                        cameraStream = await navigator.mediaDevices.getUserMedia(constraints);
-                    } catch (e) {
-                        // If 'environment' fails, try 'user' (front camera)
-                        console.warn("Could not access 'environment' camera, trying 'user' camera.", e);
-                        constraints = { video: { facingMode: 'user' } };
-                        cameraStream = await navigator.mediaDevices.getUserMedia(constraints);
-                    }
-                    
-                    // Fallback to generic video:true if specific facingModes fail
-                    if (!cameraStream) {
-                        console.warn("Could not access 'user' camera, trying generic video:true.");
-                        constraints = { video: true };
-                        cameraStream = await navigator.mediaDevices.getUserMedia(constraints);
-                    }
-
-
-                    if (cameraStream) {
-                        cameraFeed.srcObject = cameraStream;
-                        cameraFeed.classList.remove('hidden');
-                        startCameraBtn.classList.add('hidden');
-                        stopCameraBtn.classList.remove('hidden');
-                        captureImageBtn.classList.remove('hidden');
-                        captureImageBtn.disabled = false; // Enable capture
-                        showStatus('Camera started. Position the ingredients label.', false);
-                    } else {
-                        // This case should ideally be caught by the catch block, but as a safeguard
-                        showCameraError('Failed to get camera stream. No camera available or accessible.');
-                        showStatus('Camera failed to start.', true);
-                        startCameraBtn.disabled = false; // Re-enable if no stream
-                    }
-
-                } catch (error) {
-                    console.error("Error accessing camera:", error);
-                    let errorMessage = "Could not access the camera. Please check your browser settings and ensure a camera is available.";
-                    
-                    if (error.name === "NotAllowedError" || error.name === "SecurityError") {
-                        errorMessage = "Camera access was denied. Please allow camera access in your browser settings and refresh the page.";
-                    } else if (error.name === "NotFoundError" || error.name === "DevicesNotFoundError") {
-                        errorMessage = "No camera found on your device. Please ensure a camera is connected and enabled.";
-                    } else if (error.name === "AbortError") {
-                        errorMessage = "Camera access was aborted. Another application might be using the camera, or it's temporarily unavailable.";
-                    } else if (error.name === "NotReadableError") {
-                        errorMessage = "Camera is already in use or unavailable. Please close other applications using the camera.";
-                    }
-
-                    showCameraError(errorMessage); // Display error specific to camera area
-                    showStatus(`Camera failed to start: ${errorMessage}`, true);
-                    startCameraBtn.disabled = false; // Re-enable start button on failure
-                    stopCamera(); // Ensure stream is stopped in case of partial success
+            try {
+                const success = await initializeCamera();
+                
+                if (success) {
+                    cameraFeed.classList.remove('hidden');
+                    startCameraBtn.classList.add('hidden');
+                    stopCameraBtn.classList.remove('hidden');
+                    captureImageBtn.classList.remove('hidden');
+                    captureImageBtn.disabled = false;
+                    showStatus('Camera started. Position the ingredients label.', false);
+                } else {
+                    throw new Error('Failed to initialize camera');
                 }
-            } else {
-                showCameraError('Camera API (getUserMedia) not supported by your browser.');
-                showStatus('Camera API not supported by your browser.', true);
-                startCameraBtn.disabled = false; // Re-enable if API not supported
+            } catch (error) {
+                console.error('Camera error:', error);
+                showCameraError('Failed to start camera. Please check permissions and try again.');
+                showStatus('Camera failed to start.', true);
+                startCameraBtn.disabled = false;
+                cleanupCamera();
             }
         });
 
         stopCameraBtn.addEventListener('click', stopCamera);
 
         function stopCamera() {
-            if (cameraStream) {
-                cameraStream.getTracks().forEach(track => {
-                    track.stop(); // Stop all tracks to release the camera
-                });
-                cameraFeed.srcObject = null;
-                cameraStream = null;
-                cameraFeed.classList.add('hidden'); // Hide video feed
-            }
+            cleanupCamera();
             startCameraBtn.classList.remove('hidden');
-            startCameraBtn.disabled = false; // Ensure start button is re-enabled
+            startCameraBtn.disabled = false;
             stopCameraBtn.classList.add('hidden');
             captureImageBtn.classList.add('hidden');
-            captureImageBtn.disabled = true; // Disable capture
+            captureImageBtn.disabled = true;
             showStatus('Camera stopped.', false);
-            clearCameraStatus(); // Clear any camera-related messages
+            clearCameraStatus();
         }
-        
-        captureImageBtn.addEventListener('click', () => {
-            if (!cameraStream || cameraFeed.videoWidth === 0) { // Check if video is actually playing
+
+        // Add touch event handling for better mobile experience
+        captureImageBtn.addEventListener('touchstart', (e) => {
+            e.preventDefault(); // Prevent double-firing on mobile
+            captureImageBtn.click();
+        });
+
+        // Debounce the capture button
+        captureImageBtn.addEventListener('click', debounce(() => {
+            if (!cameraStream || cameraFeed.videoWidth === 0) {
                 showCameraError('Camera not active or video feed is empty. Please ensure camera is streaming.');
                 showStatus('Cannot capture: Camera not ready.', true);
                 return;
             }
             
             const context = imageCanvas.getContext('2d');
-            // Set canvas dimensions to match video feed, important for proper capture
-            imageCanvas.width = cameraFeed.videoWidth; 
+            imageCanvas.width = cameraFeed.videoWidth;
             imageCanvas.height = cameraFeed.videoHeight;
 
-            // Apply mirror transformation only if the video is mirrored for selfie view
             context.save();
             if (cameraFeed.style.transform === 'scaleX(-1)') {
                 context.translate(imageCanvas.width, 0);
@@ -335,14 +362,20 @@
             context.restore();
 
             const imageDataUrl = imageCanvas.toDataURL('image/png');
-            imagePreview.src = imageDataUrl; 
+            imagePreview.src = imageDataUrl;
             imagePreview.classList.remove('hidden');
-            ingredientsTextarea.value = ''; 
-            analysisOutputDiv.innerHTML = ''; 
+            ingredientsTextarea.value = '';
+            analysisOutputDiv.innerHTML = '';
             showStatus('Image captured. Performing OCR via backend...', false);
-            performOcrWithBackend(imageDataUrl.split(',')[1]); // Pass base64 data
-            stopCamera(); // Stop camera after capturing
-        });
+            performOcrWithBackend(imageDataUrl.split(',')[1]);
+            stopCamera();
+        }, 300));
+
+        // Add proper mobile viewport handling
+        const meta = document.createElement('meta');
+        meta.name = 'viewport';
+        meta.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
+        document.head.appendChild(meta);
 
         // --- OCR FUNCTION (Calls Backend) ---
         async function performOcrWithBackend(base64ImageData) {
