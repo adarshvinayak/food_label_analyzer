@@ -49,6 +49,92 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+        @media (max-width: 640px) {
+            .camera-container {
+                width: 100%;
+                max-width: 100%;
+                height: calc(100vh - 200px);
+                min-height: 400px;
+                margin: 0 auto;
+                position: relative;
+                background: #000;
+                overflow: hidden;
+            }
+            .camera-feed {
+                width: 100%;
+                height: 100%;
+                object-fit: cover;
+                transform-origin: center;
+            }
+            .camera-feed.portrait {
+                transform: rotate(90deg) scale(1.5);
+            }
+            .camera-feed.landscape {
+                transform: none;
+            }
+        }
+        .expanded-image-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.9);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            padding: 20px;
+        }
+        .expanded-image {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+        }
+        .close-expanded-image {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: white;
+            border: none;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            font-size: 24px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+        .captured-image-container {
+            position: relative;
+            width: 100%;
+            max-width: 400px;
+            margin: 0 auto;
+        }
+        .captured-image {
+            width: 100%;
+            height: auto;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+        .expand-image-btn {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            background: rgba(255, 255, 255, 0.9);
+            border: none;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            font-size: 20px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
     </style>
 </head>
 <body class="bg-slate-100 text-slate-800 min-h-screen flex flex-col items-center pt-8 pb-16 px-4">
@@ -90,11 +176,11 @@
                             <button id="stopCameraBtn" class="flex-1 bg-orange-500 hover:bg-orange-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md transition duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-orange-400 hidden">Stop Camera</button>
                             <button id="switchCameraBtn" class="flex-1 bg-purple-500 hover:bg-purple-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md transition duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-purple-400 hidden">🔄 Switch Camera</button>
                         </div>
-                        <div class="bg-slate-200 rounded-lg overflow-hidden shadow-inner aspect-video max-h-[400px] mx-auto">
+                        <div class="relative bg-slate-200 rounded-lg overflow-hidden shadow-inner mx-auto" style="width: 100%; max-width: 400px; aspect-ratio: 9/16;">
                             <video id="cameraFeed" playsinline class="w-full h-full object-cover"></video>
                             <div id="cameraStatusMessage" class="text-center text-sm text-red-500 mt-2 hidden"></div>
                         </div>
-                        <button id="captureImageBtn" class="w-full bg-green-500 hover:bg-green-600 text-white font-semibold py-3 px-6 rounded-lg shadow-md transition duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-green-400 hidden">
+                        <button id="captureImageBtn" class="w-full max-w-[400px] mx-auto bg-green-500 hover:bg-green-600 text-white font-semibold py-3 px-6 rounded-lg shadow-md transition duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-green-400 hidden">
                             📸 Capture Image
                         </button>
                         <canvas id="imageCanvas" class="hidden"></canvas>
@@ -249,9 +335,12 @@
                 cameraStream = await navigator.mediaDevices.getUserMedia(constraints);
                 cameraFeed.srcObject = cameraStream;
                 
-                // Update transform based on camera mode
-                cameraFeed.style.transform = facingMode === 'user' ? 'scaleX(-1)' : 'none';
-                currentFacingMode = facingMode;
+                // Handle orientation
+                if (window.innerWidth <= 640) { // Mobile view
+                    cameraFeed.classList.add('portrait');
+                } else {
+                    cameraFeed.classList.add('landscape');
+                }
                 
                 return new Promise((resolve) => {
                     cameraFeed.onloadedmetadata = () => {
@@ -340,21 +429,69 @@
             
             try {
                 const context = imageCanvas.getContext('2d');
-                imageCanvas.width = cameraFeed.videoWidth;
-                imageCanvas.height = cameraFeed.videoHeight;
+                
+                // Set canvas dimensions based on orientation
+                if (window.innerWidth <= 640) {
+                    imageCanvas.width = cameraFeed.videoHeight;
+                    imageCanvas.height = cameraFeed.videoWidth;
+                } else {
+                    imageCanvas.width = cameraFeed.videoWidth;
+                    imageCanvas.height = cameraFeed.videoHeight;
+                }
 
                 // Handle orientation for capture
-                if (currentFacingMode === 'user') {
+                if (window.innerWidth <= 640) {
                     context.save();
-                    context.translate(imageCanvas.width, 0);
-                    context.scale(-1, 1);
-                    context.drawImage(cameraFeed, 0, 0, imageCanvas.width, imageCanvas.height);
+                    context.translate(imageCanvas.width/2, imageCanvas.height/2);
+                    context.rotate(-Math.PI/2);
+                    context.drawImage(cameraFeed, -cameraFeed.videoHeight/2, -cameraFeed.videoWidth/2, cameraFeed.videoHeight, cameraFeed.videoWidth);
                     context.restore();
                 } else {
-                    context.drawImage(cameraFeed, 0, 0, imageCanvas.width, imageCanvas.height);
+                    if (currentFacingMode === 'user') {
+                        context.save();
+                        context.translate(imageCanvas.width, 0);
+                        context.scale(-1, 1);
+                        context.drawImage(cameraFeed, 0, 0, imageCanvas.width, imageCanvas.height);
+                        context.restore();
+                    } else {
+                        context.drawImage(cameraFeed, 0, 0, imageCanvas.width, imageCanvas.height);
+                    }
                 }
 
                 const imageDataUrl = imageCanvas.toDataURL('image/png');
+                
+                // Create captured image container
+                const capturedImageContainer = document.createElement('div');
+                capturedImageContainer.className = 'captured-image-container';
+                capturedImageContainer.innerHTML = `
+                    <img src="${imageDataUrl}" class="captured-image" alt="Captured image">
+                    <button class="expand-image-btn">🔍</button>
+                `;
+                
+                // Replace camera feed with captured image
+                const cameraContainer = cameraFeed.parentElement;
+                cameraFeed.classList.add('hidden');
+                cameraContainer.appendChild(capturedImageContainer);
+                
+                // Add expand image functionality
+                const expandBtn = capturedImageContainer.querySelector('.expand-image-btn');
+                expandBtn.addEventListener('click', () => {
+                    const expandedContainer = document.createElement('div');
+                    expandedContainer.className = 'expanded-image-container';
+                    expandedContainer.innerHTML = `
+                        <img src="${imageDataUrl}" class="expanded-image" alt="Expanded captured image">
+                        <button class="close-expanded-image">×</button>
+                    `;
+                    document.body.appendChild(expandedContainer);
+                    
+                    // Add close functionality
+                    const closeBtn = expandedContainer.querySelector('.close-expanded-image');
+                    closeBtn.addEventListener('click', () => {
+                        expandedContainer.remove();
+                    });
+                });
+
+                // Update other UI elements
                 imagePreview.src = imageDataUrl;
                 imagePreview.classList.remove('hidden');
                 ingredientsTextarea.value = '';
@@ -562,6 +699,19 @@
         // Handle tab close
         window.addEventListener('unload', () => {
             cleanupCamera();
+        });
+
+        // Add orientation change handler
+        window.addEventListener('resize', () => {
+            if (cameraStream) {
+                if (window.innerWidth <= 640) {
+                    cameraFeed.classList.remove('landscape');
+                    cameraFeed.classList.add('portrait');
+                } else {
+                    cameraFeed.classList.remove('portrait');
+                    cameraFeed.classList.add('landscape');
+                }
+            }
         });
 
     </script>
