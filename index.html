@@ -45,22 +45,6 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
-        details > summary {
-            list-style: none;
-        }
-        details > summary::-webkit-details-marker {
-            display: none;
-        }
-        details[open] > summary > span {
-            transform: rotate(180deg);
-        }
-        details > summary:focus {
-            outline: none;
-        }
-        details > summary:focus-visible {
-            outline: 2px solid #0D9488;
-            outline-offset: 2px;
-        }
     </style>
 </head>
 <body class="bg-slate-100 text-slate-800 min-h-screen flex flex-col items-center pt-8 pb-16 px-4">
@@ -70,48 +54,6 @@
             <h1 class="text-4xl md:text-5xl font-bold text-teal-700">🌿 Ingredient Inspector 🔬</h1>
             <p class="text-slate-600 mt-2 text-lg">Analyze food ingredients for a healthier choice.</p>
         </header>
-
-        <!-- Add the How It Works section to the HTML structure -->
-        <div class="mb-8 w-full">
-            <details class="bg-white rounded-lg shadow-md overflow-hidden">
-                <summary class="flex items-center justify-between p-4 cursor-pointer hover:bg-slate-50">
-                    <h2 class="text-xl font-semibold text-teal-700">ℹ️ How It Works</h2>
-                    <span class="transform transition-transform duration-200">▼</span>
-                </summary>
-                <div class="p-4 border-t border-slate-200">
-                    <div class="space-y-4">
-                        <div class="flex items-start gap-3">
-                            <div class="flex-shrink-0 w-8 h-8 bg-teal-100 rounded-full flex items-center justify-center text-teal-700 font-bold">1</div>
-                            <div>
-                                <h3 class="font-semibold text-slate-800">Upload or Capture</h3>
-                                <p class="text-slate-600">Upload an image of food ingredients or use your camera to capture the label.</p>
-                            </div>
-                        </div>
-                        <div class="flex items-start gap-3">
-                            <div class="flex-shrink-0 w-8 h-8 bg-teal-100 rounded-full flex items-center justify-center text-teal-700 font-bold">2</div>
-                            <div>
-                                <h3 class="font-semibold text-slate-800">Review & Edit</h3>
-                                <p class="text-slate-600">Review the extracted text and make any necessary edits to ensure accuracy.</p>
-                            </div>
-                        </div>
-                        <div class="flex items-start gap-3">
-                            <div class="flex-shrink-0 w-8 h-8 bg-teal-100 rounded-full flex items-center justify-center text-teal-700 font-bold">3</div>
-                            <div>
-                                <h3 class="font-semibold text-slate-800">AI Analysis</h3>
-                                <p class="text-slate-600">Our AI analyzes the ingredients and provides detailed insights about their health impact.</p>
-                            </div>
-                        </div>
-                        <div class="flex items-start gap-3">
-                            <div class="flex-shrink-0 w-8 h-8 bg-teal-100 rounded-full flex items-center justify-center text-teal-700 font-bold">4</div>
-                            <div>
-                                <h3 class="font-semibold text-slate-800">Get Results</h3>
-                                <p class="text-slate-600">Receive a comprehensive analysis including health score, ingredient breakdown, and alternatives.</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </details>
-        </div>
 
         <!-- Input Section -->
         <section id="inputSection" class="mb-8">
